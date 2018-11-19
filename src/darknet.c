@@ -13,7 +13,7 @@
 #endif
 
 extern void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filename, int top);
-extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, int ext_output);
+extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, int dont_show, int ext_output, int save_labels, char *outfile);
 extern void run_voxel(int argc, char **argv);
 extern void run_yolo(int argc, char **argv);
 extern void run_detector(int argc, char **argv);
@@ -395,9 +395,13 @@ int main(int argc, char **argv)
         run_detector(argc, argv);
     } else if (0 == strcmp(argv[1], "detect")){
         float thresh = find_float_arg(argc, argv, "-thresh", .24);
-		int ext_output = find_arg(argc, argv, "-ext_output");
+	int ext_output = find_arg(argc, argv, "-ext_output");
         char *filename = (argc > 4) ? argv[4]: 0;
-        test_detector("cfg/coco.data", argv[2], argv[3], filename, thresh, ext_output);
+        float hier_thresh = find_float_arg(argc, argv, "-hier", .5);
+	int dont_show = find_arg(argc, argv, "-dont_show");
+	int save_labels = find_arg(argc, argv, "-save_labels");
+	char *outfile = find_char_arg(argc, argv, "-out", NULL);
+        test_detector("cfg/coco.data", argv[2], argv[3], filename, thresh, hier_thresh, dont_show, ext_output, save_labels, outfile);
     } else if (0 == strcmp(argv[1], "cifar")){
         run_cifar(argc, argv);
     } else if (0 == strcmp(argv[1], "go")){
