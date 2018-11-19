@@ -17,7 +17,7 @@ cfg/
 build/darknet/*
 !build/darknet/YoloWrapper.cs
 .fuse*
-./darknet
+darknet
 
 # OS Generated #
 .DS_Store*
