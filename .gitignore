@@ -29,3 +29,5 @@ Thumbs.db
 # CMake #
 cmake-build-debug/
 CMakeLists.txt
+
+restd/bin/
