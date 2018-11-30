@@ -1,5 +1,5 @@
 /**************************************************************
- * common.h - common header file for AUDIOAPP
+ * common.h - common header file for CLASSIFYAPP
  *          
  * Copyright (C) 2015 Zipreel Inc.
  *
@@ -11,7 +11,7 @@
 
 #pragma once
 
-// #include <curl/curl.h>
+#include <curl/curl.h>
 #include <stdio.h>
 #include <syslog.h>
 #include <stdlib.h>
@@ -64,20 +64,20 @@ typedef uint64_t u64;
 typedef int64_t i64;
 typedef unsigned int u32;
 
-typedef struct _audioapp_config_struct_ {
+typedef struct _classifyapp_config_struct_ {
 
-  int  channel;
+  //int  channel;
   char input_url[LARGE_FIXED_STRING_SIZE];
   char input_type[SMALL_FIXED_STRING_SIZE];
   char output_directory[LARGE_FIXED_STRING_SIZE];
   char output_fileprefix[LARGE_FIXED_STRING_SIZE];
-  char acoustic_model[LARGE_FIXED_STRING_SIZE];
-  char dictionary[LARGE_FIXED_STRING_SIZE];
-  char language_model[LARGE_FIXED_STRING_SIZE];
-  float writeout_duration;
-  bool crash_recovery_flag;
+  //char acoustic_model[LARGE_FIXED_STRING_SIZE];
+  //char dictionary[LARGE_FIXED_STRING_SIZE];
+  //char language_model[LARGE_FIXED_STRING_SIZE];
+  //float writeout_duration;
+  //bool crash_recovery_flag;
 
-} audioapp_config_struct;
+} classifyapp_config_struct;
 
 /* 
 
@@ -89,36 +89,38 @@ typedef struct FilteringContext {
 
 */
 
-typedef struct _audioapp_struct_ {
 
-  audioapp_config_struct   appconfig;
+typedef struct _classifyapp_struct_ {
+
+  classifyapp_config_struct   appconfig;
 
   volatile int             input_thread_is_active;
-  volatile int             audio_decoder_thread_is_active;
   volatile int             proc_thread_is_active;
 
   void                     *input_packet_queue;
   sem_t                    *input_queue_sem;
-
+    
   void                     *input_packet_buffer_pool;
   sem_t                    *input_packet_sem;
 
+  /* 
   void                     *speech_proc_packet_queue;
   sem_t                    *speech_proc_queue_sem;
 
   void                     *speech_proc_packet_buffer_pool;
   sem_t                    *speech_proc_packet_sem;
-
+  */
+  
   void                     *system_message_pool;
 
-  void                     *audio_decoder_buffer_pool;
+  // void                     *audio_decoder_buffer_pool;
 
   pthread_t                input_thread_id;
 
-  pthread_t                audio_decoder_thread_id;
+  // pthread_t                audio_decoder_thread_id;
   pthread_t                proc_thread_id;
 
-  // CURL                     *curl_data;
+  CURL                     *curl_data;
   double                   bytes_pulled, bytes_pushed, bytes_pulled_report;
   double                   bytes_processed;
   double                   input_mux_rate;
@@ -126,13 +128,16 @@ typedef struct _audioapp_struct_ {
   u64                      cur_input_packet_fill;
   uint8_t                  *cur_input_packet;
 
+  /*
   u64                      cur_speech_proc_packet_fill;
   uint8_t                  *cur_speech_proc_packet;
   FILE                     *cur_speech_proc_packet_fd;
-
+  */
+  
   pthread_mutex_t          http_input_thread_complete_mutex;
   bool                     http_input_thread_complete;
 
+  /* 
   pthread_mutex_t          audio_decoder_thread_complete_mutex;
   bool                     audio_decoder_thread_complete;
 
@@ -141,7 +146,8 @@ typedef struct _audioapp_struct_ {
 
   pthread_mutex_t          input_codec_mutex;
   pthread_mutex_t          input_fmt_ctx_mutex;
-
+  */
+  
   uint64_t                 decoded_frame_count;
   uint64_t                 decoded_total_bytes;
 
@@ -150,21 +156,25 @@ typedef struct _audioapp_struct_ {
   struct timespec          pull_start_timestamp;
   int64_t                  pull_start_ts_high, pull_start_ts_low, pull_end_ts_high, pull_end_ts_low;
 
+  /* 
   struct timespec          audio_decoder_start_timestamp;
   int64_t                  audio_decode_start_ts_high, audio_decode_start_ts_low, audio_decode_end_ts_high, audio_decode_end_ts_low;
   double                   audio_decode_buf_fill_sofar, num_audio_decode_bufs_sofar, expected_total_audio_decode_buf_fill_sofar;
   double                   ewma_audio_decode_buf_fill;
 
   pthread_mutex_t          audio_decode_buf_mutex;
-
+  */
+  
   void                     *event_message_queue;
   void                     *event_message_pool;
-  
+
+  /* 
   int                      audio_decode_read_frame_retries;
   int                      audio_decode_read_frame_backoff;  
   int                      full_process_retries;
   int                      full_process_retry_backoff;
-
+  */
+  
   igolgi_message_struct    *cur_message_wrapper;
 
   char                     *restful_err_str;
@@ -174,12 +184,12 @@ typedef struct _audioapp_struct_ {
 
   FILE                     *samplefptr;
 
-} audioapp_struct;
+} classifyapp_struct;
 
 /* 
 typedef struct _speech_proc_hyp_struct_ {
 
-  audioapp_struct          *audioapp_inst;
+  classifyapp_struct          *classifyapp_inst;
 
   ps_decoder_t             *ps;
   cmd_ln_t                 *sphinx_config_obj;
@@ -235,4 +245,4 @@ typedef struct _speech_proc_hyp_struct_ {
 
 #define __PRINTF(fmt, args...) { fprintf(stdout, fmt , ## args); fflush(stdout); }
 #define DEBUG_PRINTF(fmt, args...) __PRINTF(fmt , ## args)
-//#define AUDIOAPP_DEBUG
+//#define CLASSIFYAPP_DEBUG

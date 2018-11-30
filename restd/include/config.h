@@ -18,6 +18,11 @@ struct Config
   char           dnn_config_file[LARGE_FIXED_STRING_SIZE];
   char           dnn_weights_file[LARGE_FIXED_STRING_SIZE];
 
+  unsigned int   daemon_port;
+  char           image_url[LARGE_FIXED_STRING_SIZE];
+  char           output_directory[LARGE_FIXED_STRING_SIZE];
+  char           output_fileprefix[LARGE_FIXED_STRING_SIZE];
+  
 };
 
 const struct Config* get_config();

@@ -1,5 +1,5 @@
 /**************************************************************
- * puller.h - pull from URL header file for AUDIOAPP
+ * puller.h - pull from URL header file for CLASSIFYAPP
  *          
  * Copyright (C) 2015 Zipreel Inc.
  *
@@ -12,4 +12,4 @@
 #pragma once
 
 void *http_input_thread_func(void *arg);
-int config_curl_and_pull_file_sample(audioapp_struct *audioapp_data);
+int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data);

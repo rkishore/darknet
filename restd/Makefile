@@ -16,14 +16,14 @@ endif
 CFLAGS=$(DEFINES) -I$(IDIR) -ggdb -Wall -O2 -D_REENTRANT -D_GNU_SOURCE -Wno-unused -fno-strict-aliasing -DBASE_THREADSAFE 
 
 #LIBS=-lpthread -L/usr/local/lib -Wl,-Bsymbolic-functions -Wl,-z,relro `pkg-config --libs pocketsphinx sphinxbase openssl zlib libavfilter libavformat libavcodec libavutil libswscale libswresample libpostproc` 
-LIBS=-lpthread -L/usr/local/lib -Wl,-Bsymbolic-functions -Wl,-z,relro -lm -lcurl -lcrypto
+LIBS=-lpthread -L/usr/local/lib -lcurl -Wl,-Bsymbolic-functions -Wl,-z,relro -lcrypto -lm
 
 # Set of .h files the .c files depend on
 _DEPS = config.h serialnum.h init.h puller.h fastpool.h threadqueue.h dfxp.h allocator.h pool.h cjson.h restful.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 #_OBJS = fastpool.o threadqueue.o config.o serialnum.o init.o dfxp.o allocator.o pool.o comm.o udpcomm.o cjson.o restful.o classifyapp.o
-_OBJS = fastpool.o threadqueue.o config.o serialnum.o init.o allocator.o pool.o comm.o udpcomm.o cjson.o classifyapp.o
+_OBJS = fastpool.o threadqueue.o config.o serialnum.o init.o allocator.o pool.o comm.o udpcomm.o cjson.o puller.o restful.o classifyapp.o
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 
 $(ODIR)/%.o: $(SRC)/%.c $(DEPS)

@@ -49,6 +49,7 @@ void print_usage(const char *app_name)
   fprintf(stderr, "-c, --dnn-weights-file | Filesystem location of the dnn weights file | Default: %s\n", get_config()->dnn_weights_file);
   fprintf(stderr, "-d, --detection-thresh | Detection threshold below which objects detected are not reported | Default: %0.1f\n", get_config()->detection_thresh);
   fprintf(stderr, "-L, --log-level | Set the syslog LOG LEVEL | Default: LOG_INFO (%s) \n", get_config()->debug_level);
+  fprintf(stderr, "-e, --port [port number] | Port daemon is listening on for REST-ful API | Default = %d (if unspecified)\n", get_config()->daemon_port);
   
   fprintf(stderr, "\n");
 
@@ -133,6 +134,7 @@ void fill_default_config()
   strcpy(&config->dnn_weights_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/yolov3.weights");
       
   config->detection_thresh = 0.5;
+  config->daemon_port = 55555;
   
   return;
   

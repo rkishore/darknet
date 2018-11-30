@@ -21,10 +21,10 @@
 
 #define RESTFUL_MAX_MESSAGE_SIZE      1024
 #define MAX_LISTEN 10
-#define GET_CUR_TRANSCRIBE_INFO 0
+#define GET_CUR_CLASSIFY_INFO 0
 #define MIN_RUNNING_TIME_BEFORE_STOP 30
 
-static int cur_transcribe_id = START_TRANSCRIBE_ID;
+static int cur_classify_id = START_CLASSIFY_ID;
 
 static int open_tcp_server_socket(int port)
 {
@@ -251,19 +251,19 @@ static void handle_get_all_request(cJSON **resp_json, restful_comm_struct *restf
 
     cJSON_AddNumberToObject(cur_transcribe_json, "percentage_finished", cur_perc_finished);
 
-    if ( (cur_transcribe_status == TRANSCRIBE_STATUS_COMPLETED) && (cur_perc_finished == 100) ) {
+    if ( (cur_transcribe_status == CLASSIFY_STATUS_COMPLETED) && (cur_perc_finished == 100) ) {
       cJSON_AddStringToObject(cur_transcribe_json, "status", "finished");
       cJSON_AddNullToObject(cur_transcribe_json, "error_msg");
     } else {
-      if (cur_transcribe_status == TRANSCRIBE_STATUS_STOPPED)
+      if (cur_transcribe_status == CLASSIFY_STATUS_STOPPED)
 	cJSON_AddStringToObject(cur_transcribe_json, "status", "stopped");
-      else if (cur_transcribe_status == TRANSCRIBE_STATUS_ERROR)
+      else if (cur_transcribe_status == CLASSIFY_STATUS_ERROR)
 	cJSON_AddStringToObject(cur_transcribe_json, "status", "error");
       else
 	cJSON_AddStringToObject(cur_transcribe_json, "status", "running");
 
-      if ( (cur_transcribe_status == TRANSCRIBE_STATUS_STOPPED) || 
-	   !(cur_transcribe_status == TRANSCRIBE_STATUS_ERROR) )
+      if ( (cur_transcribe_status == CLASSIFY_STATUS_STOPPED) || 
+	   !(cur_transcribe_status == CLASSIFY_STATUS_ERROR) )
 	cJSON_AddNullToObject(cur_transcribe_json, "error_msg");
       else
 	cJSON_AddStringToObject(cur_transcribe_json, "error_msg", "transcribe did not complete");
@@ -287,19 +287,19 @@ static void handle_get_all_request(cJSON **resp_json, restful_comm_struct *restf
 
 static void handle_delete_request(int8_t *return_http_flag, restful_comm_struct *restful)
 {
-  int cur_transcribe_status = -1;
-  audioapp_struct *cur_audioapp_data = restful->audioapp_data;
+  int cur_classify_status = -1;
+  classifyapp_struct *cur_classifyapp_data = restful->classifyapp_data;
   struct timespec cur_timestamp;
   long running_time_sec = -1;
 
-  pthread_mutex_lock(&restful->cur_transcribe_info.job_status_lock);
-  cur_transcribe_status = restful->cur_transcribe_info.transcribe_status;
-  pthread_mutex_unlock(&restful->cur_transcribe_info.job_status_lock);
+  pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
+  cur_classify_status = restful->cur_classify_info.classify_status;
+  pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
 
   clock_gettime(CLOCK_REALTIME, &cur_timestamp);
-  running_time_sec = (long)difftime(cur_timestamp.tv_sec, restful->cur_transcribe_info.start_timestamp.tv_sec);
+  running_time_sec = (long)difftime(cur_timestamp.tv_sec, restful->cur_classify_info.start_timestamp.tv_sec);
 
-  if (cur_transcribe_status == TRANSCRIBE_STATUS_RUNNING) {
+  if (cur_classify_status == CLASSIFY_STATUS_RUNNING) {
   
     //pthread_mutex_lock(&restful->mp4reader_active_lock);
     //restful->is_mp4file_thread_active = 0;
@@ -307,9 +307,9 @@ static void handle_delete_request(int8_t *return_http_flag, restful_comm_struct 
 
     if (running_time_sec > MIN_RUNNING_TIME_BEFORE_STOP) {
 
-      pthread_mutex_lock(&restful->cur_transcribe_info.job_status_lock);
-      restful->cur_transcribe_info.transcribe_status = TRANSCRIBE_STATUS_STOPPED;
-      pthread_mutex_unlock(&restful->cur_transcribe_info.job_status_lock);
+      pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
+      restful->cur_classify_info.classify_status = CLASSIFY_STATUS_STOPPED;
+      pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
       
       *return_http_flag = HTTP_204;
 
@@ -323,7 +323,7 @@ static void handle_delete_request(int8_t *return_http_flag, restful_comm_struct 
 
   } else {
 
-    char *cur_err = "No active transcribe is running!";
+    char *cur_err = "No active classify is running!";
     syslog(LOG_ERR, "= %s, line:%d, %s", cur_err, __LINE__, __FILE__);
     *return_http_flag = HTTP_400;	
     
@@ -332,7 +332,7 @@ static void handle_delete_request(int8_t *return_http_flag, restful_comm_struct 
   return;
 }
 	
-static int store_input_loc(cJSON **input_file_loc, audioapp_struct *audioapp_data, int8_t *response_http_code) 
+static int store_input_loc(cJSON **input_file_loc, classifyapp_struct *classifyapp_data, int8_t *response_http_code) 
 {
 
   cJSON *input_data = *input_file_loc;
@@ -341,9 +341,9 @@ static int store_input_loc(cJSON **input_file_loc, audioapp_struct *audioapp_dat
 
   if (input_data) {
 
-    snprintf(audioapp_data->appconfig.input_url, LARGE_FIXED_STRING_SIZE-1, "%s", input_data->valuestring);
-    //fprintf(stderr,"input_url: %s\n", audioapp_data->appconfig.input_url);
-    //syslog(LOG_INFO,"= input_url: %s\n", audioapp_data->appconfig.input_url);
+    snprintf(classifyapp_data->appconfig.input_url, LARGE_FIXED_STRING_SIZE-1, "%s", input_data->valuestring);
+    //fprintf(stderr,"input_url: %s\n", classifyapp_data->appconfig.input_url);
+    //syslog(LOG_INFO,"= input_url: %s\n", classifyapp_data->appconfig.input_url);
 
   } else {
 
@@ -363,7 +363,7 @@ static int store_input_loc(cJSON **input_file_loc, audioapp_struct *audioapp_dat
 
 }
 
-static int store_input_type(cJSON **input_type, audioapp_struct *audioapp_data, int8_t *response_http_code) 
+static int store_input_type(cJSON **input_type, classifyapp_struct *classifyapp_data, int8_t *response_http_code) 
 {
 
   cJSON *input_type_data = *input_type;
@@ -386,9 +386,9 @@ static int store_input_type(cJSON **input_type, audioapp_struct *audioapp_data, 
       return -1;
 
     } else {
-      snprintf(audioapp_data->appconfig.input_type, SMALL_FIXED_STRING_SIZE-1, "%s", input_type_data->valuestring);
-      //fprintf(stderr, "input_type: %s\n", audioapp_data->appconfig.input_type);
-      //syslog(LOG_INFO,"= input_type: %s\n", audioapp_data->appconfig.input_type);
+      snprintf(classifyapp_data->appconfig.input_type, SMALL_FIXED_STRING_SIZE-1, "%s", input_type_data->valuestring);
+      //fprintf(stderr, "input_type: %s\n", classifyapp_data->appconfig.input_type);
+      //syslog(LOG_INFO,"= input_type: %s\n", classifyapp_data->appconfig.input_type);
     }
 
   } else {
@@ -410,7 +410,7 @@ static int store_input_type(cJSON **input_type, audioapp_struct *audioapp_data, 
 
 }
 
-static int store_output_file_loc(cJSON **output_file_dir, cJSON **output_file_prefix, audioapp_struct *audioapp_data, int8_t *response_http_code) 
+static int store_output_file_loc(cJSON **output_file_dir, cJSON **output_file_prefix, classifyapp_struct *classifyapp_data, int8_t *response_http_code) 
 {
   cJSON *output_dir = *output_file_dir, *output_fileprefix = *output_file_prefix;
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
@@ -418,10 +418,10 @@ static int store_output_file_loc(cJSON **output_file_dir, cJSON **output_file_pr
 
   if ( (output_dir) && (output_file_prefix) ) {
 
-    snprintf(audioapp_data->appconfig.output_directory, LARGE_FIXED_STRING_SIZE-1, "%s", output_dir->valuestring);
-    snprintf(audioapp_data->appconfig.output_fileprefix, LARGE_FIXED_STRING_SIZE-1, "%s", output_fileprefix->valuestring);
-    //fprintf(stderr,"output_data: %s\n", audioapp_data->appconfig.output_filename);
-    //syslog(LOG_INFO,"= output_filename: %s\n", audioapp_data->appconfig.output_filename);
+    snprintf(classifyapp_data->appconfig.output_directory, LARGE_FIXED_STRING_SIZE-1, "%s", output_dir->valuestring);
+    snprintf(classifyapp_data->appconfig.output_fileprefix, LARGE_FIXED_STRING_SIZE-1, "%s", output_fileprefix->valuestring);
+    //fprintf(stderr,"output_data: %s\n", classifyapp_data->appconfig.output_filename);
+    //syslog(LOG_INFO,"= output_filename: %s\n", classifyapp_data->appconfig.output_filename);
 
   } else {
     
@@ -441,27 +441,27 @@ static int store_output_file_loc(cJSON **output_file_dir, cJSON **output_file_pr
 }
 
 
-static int store_config_info(cJSON **config_info, audioapp_struct *audioapp_data, int8_t *response_http_code) 
+static int store_config_info(cJSON **config_info, classifyapp_struct *classifyapp_data, int8_t *response_http_code) 
 {
   cJSON *config_data = *config_info;
-  cJSON *acoustic_model = NULL, *dictionary = NULL, *language_model = NULL, *writeout_duration = NULL;
 
   if (config_data) {
-
-    acoustic_model = cJSON_GetObjectItem(config_data, "acoustic_model");
+    
+    /* acoustic_model = cJSON_GetObjectItem(config_data, "acoustic_model");
     dictionary = cJSON_GetObjectItem(config_data, "dictionary");
     language_model = cJSON_GetObjectItem(config_data, "language_model");
     writeout_duration = cJSON_GetObjectItem(config_data, "writeout_duration");
-
+    */
+    
     //int type;					/* The type of the item, as above. */
     //	char *valuestring;			/* The item's string, if type==cJSON_String */
     //	int valueint;				/* The item's number, if type==cJSON_Number */
     //	double valuedouble;			/* The item's number, if type==cJSON_Number */
 
-    if ((acoustic_model) && (acoustic_model->valuestring)) {
+    /* if ((acoustic_model) && (acoustic_model->valuestring)) {
 
-      snprintf(audioapp_data->appconfig.acoustic_model, LARGE_FIXED_STRING_SIZE-1, "%s", acoustic_model->valuestring);
-      syslog(LOG_DEBUG,"= acoustic_model: %s\n", audioapp_data->appconfig.acoustic_model);
+      snprintf(classifyapp_data->appconfig.acoustic_model, LARGE_FIXED_STRING_SIZE-1, "%s", acoustic_model->valuestring);
+      syslog(LOG_DEBUG,"= acoustic_model: %s\n", classifyapp_data->appconfig.acoustic_model);
 
     } else {
 
@@ -479,8 +479,8 @@ static int store_config_info(cJSON **config_info, audioapp_struct *audioapp_data
 
     if ((dictionary) && (dictionary->valuestring)) {
 
-      snprintf(audioapp_data->appconfig.dictionary, LARGE_FIXED_STRING_SIZE-1, "%s", dictionary->valuestring);
-      syslog(LOG_DEBUG,"= dictionary: %s\n", audioapp_data->appconfig.dictionary);
+      snprintf(classifyapp_data->appconfig.dictionary, LARGE_FIXED_STRING_SIZE-1, "%s", dictionary->valuestring);
+      syslog(LOG_DEBUG,"= dictionary: %s\n", classifyapp_data->appconfig.dictionary);
 
     } else {
 
@@ -499,8 +499,8 @@ static int store_config_info(cJSON **config_info, audioapp_struct *audioapp_data
 
     if ((language_model) && (language_model->valuestring)) {
       
-      snprintf(audioapp_data->appconfig.language_model, LARGE_FIXED_STRING_SIZE-1, "%s", language_model->valuestring);
-      syslog(LOG_DEBUG,"= language_model: %s\n", audioapp_data->appconfig.language_model);
+      snprintf(classifyapp_data->appconfig.language_model, LARGE_FIXED_STRING_SIZE-1, "%s", language_model->valuestring);
+      syslog(LOG_DEBUG,"= language_model: %s\n", classifyapp_data->appconfig.language_model);
 
     } else {
 
@@ -518,17 +518,17 @@ static int store_config_info(cJSON **config_info, audioapp_struct *audioapp_data
 
     if ( (writeout_duration) && (writeout_duration->valuedouble) ) {
       
-      audioapp_data->appconfig.writeout_duration = writeout_duration->valuedouble;
-      syslog(LOG_DEBUG,"= writeout_duration: %0.1f\n", audioapp_data->appconfig.writeout_duration);
+      classifyapp_data->appconfig.writeout_duration = writeout_duration->valuedouble;
+      syslog(LOG_DEBUG,"= writeout_duration: %0.1f\n", classifyapp_data->appconfig.writeout_duration);
 
     } else {
 
-      audioapp_data->appconfig.writeout_duration = get_config()->writeout_duration;
-      syslog(LOG_DEBUG,"= writeout_duration: %0.1f\n", audioapp_data->appconfig.writeout_duration);
+      classifyapp_data->appconfig.writeout_duration = get_config()->writeout_duration;
+      syslog(LOG_DEBUG,"= writeout_duration: %0.1f\n", classifyapp_data->appconfig.writeout_duration);
 
     }
     
-    
+    */
 
   } else {
 
@@ -550,70 +550,55 @@ static int store_config_info(cJSON **config_info, audioapp_struct *audioapp_data
 static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, restful_comm_struct *restful)
 {
   char *out = NULL;
-  cJSON *input_data = NULL, *input_type_data = NULL, *output_dir = NULL, *config_data = NULL, *output_fileprefix = NULL;
-  audioapp_struct *cur_audioapp_data = restful->audioapp_data;
-  int cur_transcribe_thread_status = -1;
+  cJSON *input_data = NULL, *output_dir = NULL, *config_data = NULL, *output_fileprefix = NULL;
+  classifyapp_struct *cur_classifyapp_data = restful->classifyapp_data;
+  int cur_classify_thread_status = -1;
 
-  // Check if transcribe thread is idle
+  // Check if classify thread is idle
   pthread_mutex_lock(&restful->thread_status_lock);
-  cur_transcribe_thread_status = restful->transcribe_thread_status;
+  cur_classify_thread_status = restful->classify_thread_status;
   pthread_mutex_unlock(&restful->thread_status_lock);
 
-  if (cur_transcribe_thread_status == TRANSCRIBE_THREAD_STATUS_IDLE) {
+  if (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_IDLE) {
 
     //fprintf(stderr,"decoding data:%s\n", lineptr);
     input_data = cJSON_GetObjectItem(*parsedjson, "input");
-    input_type_data = cJSON_GetObjectItem(*parsedjson, "input_type");
     output_dir = cJSON_GetObjectItem(*parsedjson, "output_dir");
     output_fileprefix = cJSON_GetObjectItem(*parsedjson, "output_fileprefix");
-    config_data = cJSON_GetObjectItem(*parsedjson, "config");
+    // config_data = cJSON_GetObjectItem(*parsedjson, "config");
 
-    if ( (input_data == NULL) || (input_type_data == NULL) || 
-	 (output_dir == NULL) || (output_fileprefix == NULL) || 
-	 (config_data == NULL) ) {
+    if ( (input_data == NULL) || 
+	 (output_dir == NULL) || (output_fileprefix == NULL) ) {
+	 // || (config_data == NULL) ) {
       *return_http_flag = HTTP_400;
       return -1;
     }
 
-    if (store_input_loc(&input_data, cur_audioapp_data, return_http_flag) < 0) 
+    if (store_input_loc(&input_data, cur_classifyapp_data, return_http_flag) < 0) 
       return -1;
-
-    if (store_input_type(&input_type_data, cur_audioapp_data, return_http_flag) < 0) 
-      return -1;    
     
-    if (store_output_file_loc(&output_dir, &output_fileprefix, cur_audioapp_data, return_http_flag) < 0) 
+    if (store_output_file_loc(&output_dir, &output_fileprefix, cur_classifyapp_data, return_http_flag) < 0) 
       return -1;
 
-    if (store_config_info(&config_data, cur_audioapp_data, return_http_flag) < 0) 
-      return -1;    
+    //if (store_config_info(&config_data, cur_classifyapp_data, return_http_flag) < 0) 
+    //return -1;    
 
     *return_http_flag = HTTP_201;
     
     pthread_mutex_lock(&restful->thread_status_lock);
-    restful->transcribe_thread_status = TRANSCRIBE_THREAD_STATUS_BUSY;
+    restful->classify_thread_status = CLASSIFY_THREAD_STATUS_BUSY;
     pthread_mutex_unlock(&restful->thread_status_lock);	      
     
-    restful->cur_transcribe_info.transcribe_id = cur_transcribe_id++;
-    restful->cur_transcribe_info.transcribe_status = TRANSCRIBE_STATUS_RUNNING;
-    clock_gettime(CLOCK_REALTIME, &restful->cur_transcribe_info.start_timestamp);
+    restful->cur_classify_info.classify_id = cur_classify_id++;
+    restful->cur_classify_info.classify_status = CLASSIFY_STATUS_RUNNING;
+    clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.start_timestamp);
 
-#ifdef IQMEDIA_DEBUG
-
-    syslog(LOG_DEBUG, "= RESTFUL_THREAD_RCV | acoustic_model: %s | dictionary: %s | language_model: %s | audio_url: %s (%s)\n", 
-	   cur_audioapp_data->appconfig.acoustic_model, 
-	   cur_audioapp_data->appconfig.dictionary, 
-	   cur_audioapp_data->appconfig.language_model,
-	   cur_audioapp_data->appconfig.input_url, 
-	   cur_audioapp_data->appconfig.input_type);
+    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV | image_url: %s | output_directory: %s | output_fileprefix: %s\n", 
+	   cur_classifyapp_data->appconfig.input_url,
+	   cur_classifyapp_data->appconfig.output_directory,
+	   cur_classifyapp_data->appconfig.output_fileprefix);
     
-    syslog(LOG_DEBUG, "= RESTFUL_THREAD_RCV | output_directory: %s | output_fileprefix: %s | writeout_duration: %0.1f\n",
-	   cur_audioapp_data->appconfig.output_filename,
-	   cur_audioapp_data->appconfig.output_fileprefix,
-	   cur_audioapp_data->appconfig.writeout_duration);
-    
-#endif
-    
-    restful->cur_transcribe_info.percentage_finished = 0;
+    restful->cur_classify_info.percentage_finished = 0;
 
     //cJSON_Delete(json);		
     //fprintf(stderr,"\n\n\n\ndecoded data\n");			    
@@ -657,41 +642,21 @@ static void parse_and_handle_post_request(uint32_t **input_request_data, cJSON *
 
 static void copy_to_global_config(restful_comm_struct *restful_ptr)
 {
-  audioapp_struct *audioapp_info = restful_ptr->audioapp_data;
+  classifyapp_struct *classifyapp_info = restful_ptr->classifyapp_data;
 
-  memset(mod_config()->audio_url, 0, LARGE_FIXED_STRING_SIZE);
-  memcpy(mod_config()->audio_url, audioapp_info->appconfig.input_url, strlen(audioapp_info->appconfig.input_url));
-
-  memset(mod_config()->input_type, 0, SMALL_FIXED_STRING_SIZE);
-  memcpy(mod_config()->input_type, audioapp_info->appconfig.input_type, strlen(audioapp_info->appconfig.input_type));
+  memset(mod_config()->image_url, 0, LARGE_FIXED_STRING_SIZE);
+  memcpy(mod_config()->image_url, classifyapp_info->appconfig.input_url, strlen(classifyapp_info->appconfig.input_url));
       
   memset(mod_config()->output_directory, 0, LARGE_FIXED_STRING_SIZE);
-  memcpy(mod_config()->output_directory, audioapp_info->appconfig.output_directory, strlen(audioapp_info->appconfig.output_directory));
+  memcpy(mod_config()->output_directory, classifyapp_info->appconfig.output_directory, strlen(classifyapp_info->appconfig.output_directory));
 
   memset(mod_config()->output_fileprefix, 0, LARGE_FIXED_STRING_SIZE);
-  memcpy(mod_config()->output_fileprefix, audioapp_info->appconfig.output_fileprefix, strlen(audioapp_info->appconfig.output_fileprefix));
+  memcpy(mod_config()->output_fileprefix, classifyapp_info->appconfig.output_fileprefix, strlen(classifyapp_info->appconfig.output_fileprefix));
 
-  memset(mod_config()->acoustic_model, 0, LARGE_FIXED_STRING_SIZE);
-  memcpy(mod_config()->acoustic_model, audioapp_info->appconfig.acoustic_model, strlen(audioapp_info->appconfig.acoustic_model));
-
-  memset(mod_config()->dictionary, 0, LARGE_FIXED_STRING_SIZE);
-  memcpy(mod_config()->dictionary, audioapp_info->appconfig.dictionary, strlen(audioapp_info->appconfig.dictionary));
-
-  memset(mod_config()->language_model, 0, LARGE_FIXED_STRING_SIZE);
-  memcpy(mod_config()->language_model, audioapp_info->appconfig.language_model, strlen(audioapp_info->appconfig.language_model));
-  mod_config()->writeout_duration = audioapp_info->appconfig.writeout_duration;
-
-  syslog(LOG_DEBUG, "= COPIED DISPATCH_MSG 1 | acoustic_model: %s | dictionary: %s | language_model: %s | audio_url: %s (%s)\n", 
-	 get_config()->acoustic_model, 
-	 get_config()->dictionary, 
-	 get_config()->language_model,
-	 get_config()->audio_url, 
-	 get_config()->input_type);
-
-  syslog(LOG_DEBUG, "= COPIED DISPATCH_MSG 2 | output_directory: %s | output_fileprefix: %s | writeout_duration: %0.1f\n",
+  syslog(LOG_DEBUG, "= COPIED DISPATCH_MSG | image_url: %s | output_directory: %s | output_fileprefix: %s\n", 
+	 get_config()->image_url,
 	 get_config()->output_directory,
-	 get_config()->output_fileprefix,
-	 get_config()->writeout_duration);
+	 get_config()->output_fileprefix);
 
   return;
 }
@@ -722,8 +687,8 @@ static int parse_input_request_data(uint32_t **input_request_data,
   syslog(LOG_DEBUG,"= cmd:%s | uri:%s | version:%s", http_method, uri, version);
   //#endif
 
-  // POST for /api/v0/transcribe/
-  if ( !strcmp(uri, "/api/v0/transcribe/") || !strcmp(uri, "/api/v0/transcribe") ) {
+  // POST for /api/v0/classify/
+  if ( !strcmp(uri, "/api/v0/classify/") || !strcmp(uri, "/api/v0/classify") ) {
     
     if ( !strcmp(http_method, "POST") ) {
       
@@ -763,44 +728,44 @@ static int parse_input_request_data(uint32_t **input_request_data,
 
     }
 
-  } else if (starts_with("/api/v0/transcribe/", uri) == true) {
+  } else if (starts_with("/api/v0/classify/", uri) == true) {
     
-    int transcribe_id = -1;
+    int classify_id = -1;
 
-    // GET for /api/v0/transcribe/id/
+    // GET for /api/v0/classify/id/
     if (!strcmp(http_method, "GET")) {
 
-      sscanf((const char *)uri, "/api/v0/transcribe/%d", &transcribe_id);
-      syslog(LOG_DEBUG, "GET %s | transcribe_id: %d/%d | restful_ptr: %p", uri, transcribe_id, restful_ptr->cur_transcribe_info.transcribe_id, restful_ptr);
+      sscanf((const char *)uri, "/api/v0/classify/%d", &classify_id);
+      syslog(LOG_DEBUG, "GET %s | classify_id: %d/%d | restful_ptr: %p", uri, classify_id, restful_ptr->cur_classify_info.classify_id, restful_ptr);
       
-      //if (restful_ptr->cur_transcribe_info.transcribe_id >= 0)
+      //if (restful_ptr->cur_classify_info.classify_id >= 0)
       *return_http_flag = HTTP_200;	
       //else
       //*return_http_flag = HTTP_404;
 
-      //if (transcribe_id == restful_ptr->cur_transcribe_info.transcribe_id) 
+      //if (classify_id == restful_ptr->cur_classify_info.classify_id) 
       //*return_http_flag = HTTP_200;	
       //else {
       //*return_http_flag = HTTP_404;
-      //syslog(LOG_INFO, "GET %s | transcribe_id: %d | restful_ptr: %p | ID NOT FOUND", uri, transcribe_id, restful_ptr);
+      //syslog(LOG_INFO, "GET %s | classify_id: %d | restful_ptr: %p | ID NOT FOUND", uri, classify_id, restful_ptr);
       //}
 
     } else if (!strcmp(http_method, "DELETE")) {
 
-      sscanf((const char *)uri, "/api/v0/transcribe/%d", &transcribe_id);
-      syslog(LOG_INFO, "DELETE %s | transcribe_id: %d", uri, transcribe_id);
+      sscanf((const char *)uri, "/api/v0/classify/%d", &classify_id);
+      syslog(LOG_INFO, "DELETE %s | classify_id: %d", uri, classify_id);
 
-      //if (transcribe_id == restful_ptr->cur_transcribe_info.transcribe_id) {
+      //if (classify_id == restful_ptr->cur_classify_info.classify_id) {
       handle_delete_request(return_http_flag, restful_ptr);
 
       if (*return_http_flag == HTTP_204) {
 	syslog(LOG_INFO, "Setting end_timestamp | %p | %d, %s", restful_ptr, __LINE__, __FILE__);
-	clock_gettime(CLOCK_REALTIME, &restful_ptr->cur_transcribe_info.end_timestamp);
+	clock_gettime(CLOCK_REALTIME, &restful_ptr->cur_classify_info.end_timestamp);
       }
 
       //} else {
       //*return_http_flag = HTTP_404;
-      //syslog(LOG_INFO, "DELETE %s | transcribe_id: %d | ID NOT FOUND", uri, transcribe_id);
+      //syslog(LOG_INFO, "DELETE %s | classify_id: %d | ID NOT FOUND", uri, classify_id);
       //}
     } else {
 
@@ -817,15 +782,15 @@ static int parse_input_request_data(uint32_t **input_request_data,
 }
 
 
-static void build_response_json_for_one_transcribe(restful_comm_struct *restful_ptr, 
+static void build_response_json_for_one_classify(restful_comm_struct *restful_ptr, 
 						  cJSON **response_json)
 {
 
-  int cur_transcribe_status = -1;
+  int cur_classify_status = -1;
   float cur_perc_finished = -1.0;
   cJSON *config_json = NULL;
   char output_resolution[64];
-  audioapp_struct *cur_audioapp_data = restful_ptr->audioapp_data;
+  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
   struct tm *ptm;
   char start_time_string[MEDIUM_FIXED_STRING_SIZE], running_time_string[MEDIUM_FIXED_STRING_SIZE];
   struct timespec cur_timestamp;
@@ -833,61 +798,56 @@ static void build_response_json_for_one_transcribe(restful_comm_struct *restful_
 
   *response_json = cJSON_CreateObject();
 
-  /* pthread_mutex_lock(&restful_ptr->cur_transcribe_info.job_percent_complete_lock);
-  cur_perc_finished = restful_ptr->cur_transcribe_info.percentage_finished;
-  pthread_mutex_unlock(&restful_ptr->cur_transcribe_info.job_percent_complete_lock);
+  /* pthread_mutex_lock(&restful_ptr->cur_classify_info.job_percent_complete_lock);
+  cur_perc_finished = restful_ptr->cur_classify_info.percentage_finished;
+  pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_percent_complete_lock);
   */
 
-  pthread_mutex_lock(&restful_ptr->cur_transcribe_info.job_status_lock);
-  cur_transcribe_status = restful_ptr->cur_transcribe_info.transcribe_status;
-  pthread_mutex_unlock(&restful_ptr->cur_transcribe_info.job_status_lock);
+  pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
+  cur_classify_status = restful_ptr->cur_classify_info.classify_status;
+  pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);
 
-  cJSON_AddNumberToObject(*response_json, "id", restful_ptr->cur_transcribe_info.transcribe_id);
+  cJSON_AddNumberToObject(*response_json, "id", restful_ptr->cur_classify_info.classify_id);
 
-  if (restful_ptr->cur_transcribe_info.transcribe_id >= 0) {
+  if (restful_ptr->cur_classify_info.classify_id >= 0) {
 
-    cJSON_AddStringToObject(*response_json, "input", get_config()->audio_url);
-    cJSON_AddStringToObject(*response_json, "input_type", get_config()->input_type);
+    cJSON_AddStringToObject(*response_json, "input", get_config()->image_url);
     cJSON_AddStringToObject(*response_json, "output_dir", get_config()->output_directory);
     cJSON_AddStringToObject(*response_json, "output_fileprefix", get_config()->output_fileprefix);
 
     cJSON_AddItemToObject(*response_json, "config", config_json=cJSON_CreateObject());
-    cJSON_AddStringToObject(config_json, "acoustic_model", get_config()->acoustic_model);
-    cJSON_AddStringToObject(config_json, "dictionary", get_config()->dictionary);
-    cJSON_AddStringToObject(config_json, "language_model", get_config()->language_model);
-
  
     //cJSON_AddNumberToObject(*response_json, "percentage_finished", cur_perc_finished);
 
-    if (cur_transcribe_status == TRANSCRIBE_STATUS_COMPLETED) {
+    if (cur_classify_status == CLASSIFY_STATUS_COMPLETED) {
 
       cJSON_AddStringToObject(*response_json, "status", "finished");
       cJSON_AddNullToObject(*response_json, "error_msg");
     
-      running_time_sec = (long)difftime(restful_ptr->cur_transcribe_info.end_timestamp.tv_sec, restful_ptr->cur_transcribe_info.start_timestamp.tv_sec);
+      running_time_sec = (long)difftime(restful_ptr->cur_classify_info.end_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
       running_time_hr = running_time_sec / SECONDS_IN_HOUR;
       running_time_rem = running_time_sec % SECONDS_IN_HOUR;
       sprintf(running_time_string, "%02ld:%02ld:%02ld", running_time_hr, running_time_rem / 60, running_time_rem % 60);
 
     } else {
 
-      if (cur_transcribe_status == TRANSCRIBE_STATUS_STOPPED) {
+      if (cur_classify_status == CLASSIFY_STATUS_STOPPED) {
 
 	cJSON_AddStringToObject(*response_json, "status", "stopped");
 	cJSON_AddNullToObject(*response_json, "error_msg");
 
 	syslog(LOG_DEBUG, "Getting end_timestamp | %p | %d, %s", restful_ptr, __LINE__, __FILE__);
-	running_time_sec = (long)difftime(restful_ptr->cur_transcribe_info.end_timestamp.tv_sec, restful_ptr->cur_transcribe_info.start_timestamp.tv_sec);
+	running_time_sec = (long)difftime(restful_ptr->cur_classify_info.end_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
 	running_time_hr = running_time_sec / SECONDS_IN_HOUR;
 	running_time_rem = running_time_sec % SECONDS_IN_HOUR;
 	sprintf(running_time_string, "%02ld:%02ld:%02ld", running_time_hr, running_time_rem / 60, running_time_rem % 60);
 
-      } else if (cur_transcribe_status == TRANSCRIBE_STATUS_ERROR) {
+      } else if (cur_classify_status == CLASSIFY_STATUS_ERROR) {
 
 	cJSON_AddStringToObject(*response_json, "status", "error");
-	cJSON_AddStringToObject(*response_json, "error_msg", "transcribe error: check syslog");
+	cJSON_AddStringToObject(*response_json, "error_msg", "classify error: check syslog");
 
-	running_time_sec = (long)difftime(restful_ptr->cur_transcribe_info.end_timestamp.tv_sec, restful_ptr->cur_transcribe_info.start_timestamp.tv_sec);
+	running_time_sec = (long)difftime(restful_ptr->cur_classify_info.end_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
 	running_time_hr = running_time_sec / SECONDS_IN_HOUR;
 	running_time_rem = running_time_sec % SECONDS_IN_HOUR;
 	sprintf(running_time_string, "%02ld:%02ld:%02ld", running_time_hr, running_time_rem / 60, running_time_rem % 60);
@@ -900,7 +860,7 @@ static void build_response_json_for_one_transcribe(restful_comm_struct *restful_
 	// Report running time for this job
 	clock_gettime(CLOCK_REALTIME, &cur_timestamp);      
       
-	running_time_sec = (long)difftime(cur_timestamp.tv_sec, restful_ptr->cur_transcribe_info.start_timestamp.tv_sec);
+	running_time_sec = (long)difftime(cur_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
 	running_time_hr = running_time_sec / SECONDS_IN_HOUR;
 	running_time_rem = running_time_sec % SECONDS_IN_HOUR;
 	sprintf(running_time_string, "%02ld:%02ld:%02ld", running_time_hr, running_time_rem / 60, running_time_rem % 60);
@@ -910,9 +870,9 @@ static void build_response_json_for_one_transcribe(restful_comm_struct *restful_
     }
     
     // Report time this job started
-    ptm = localtime(&restful_ptr->cur_transcribe_info.start_timestamp.tv_sec);
+    ptm = localtime(&restful_ptr->cur_classify_info.start_timestamp.tv_sec);
     strftime(start_time_string, sizeof(start_time_string), "%Y/%m/%d %H:%M:%S", ptm);
-    //sprintf(millisec, "%0.3f", (double)(restful_ptr->cur_transcribe_info.start_timestamp.tv_nsec)/NANOSEC);
+    //sprintf(millisec, "%0.3f", (double)(restful_ptr->cur_classify_info.start_timestamp.tv_nsec)/NANOSEC);
     //strcat(start_time_string, millisec);
     cJSON_AddStringToObject(*response_json, "time_started", start_time_string);
 
@@ -932,13 +892,13 @@ static void get_response_for_get_single(restful_comm_struct *restful, char **ren
 {
   cJSON *resp_json = NULL;
   float cur_perc_finished = -1.0;
-  int cur_transcribe_status = -1;
+  int cur_classify_status = -1;
 
   // TODO: should not be doing this during the HTTP REQ-REP phase
   // Should instead get this info beforehand and report the last data read    
 
   syslog(LOG_DEBUG, "Getting end_timestamp | %p | %d, %s", restful, __LINE__, __FILE__);
-  build_response_json_for_one_transcribe(restful, &resp_json);
+  build_response_json_for_one_classify(restful, &resp_json);
   *rendered_json = cJSON_Print(resp_json);
   
   cJSON_Delete(resp_json);		
@@ -953,17 +913,17 @@ static void get_response_for_post(restful_comm_struct *restful, cJSON **parsedjs
   struct tm *ptm;
   char start_time_string[MEDIUM_FIXED_STRING_SIZE];
 
-  /* pthread_mutex_lock(&restful->cur_transcribe_info.job_percent_complete_lock);
-     cur_perc_finished = restful->cur_transcribe_info.percentage_finished;
-     pthread_mutex_unlock(&restful->cur_transcribe_info.job_percent_complete_lock);
+  /* pthread_mutex_lock(&restful->cur_classify_info.job_percent_complete_lock);
+     cur_perc_finished = restful->cur_classify_info.percentage_finished;
+     pthread_mutex_unlock(&restful->cur_classify_info.job_percent_complete_lock);
   */
 
-  cJSON_AddNumberToObject(*parsedjson, "id", restful->cur_transcribe_info.transcribe_id);
+  cJSON_AddNumberToObject(*parsedjson, "id", restful->cur_classify_info.classify_id);
   cJSON_AddStringToObject(*parsedjson, "status", "running");
   //cJSON_AddNumberToObject(*parsedjson, "percentage_finished", cur_perc_finished);
   cJSON_AddNullToObject(*parsedjson, "error_msg");
 
-  ptm = localtime(&restful->cur_transcribe_info.start_timestamp.tv_sec);
+  ptm = localtime(&restful->cur_classify_info.start_timestamp.tv_sec);
   strftime(start_time_string, sizeof(start_time_string), "%Y/%m/%d %H:%M:%S", ptm);
   cJSON_AddStringToObject(*parsedjson, "time_started", start_time_string);
   cJSON_AddStringToObject(*parsedjson, "time_running", "00:00:00");
@@ -983,9 +943,9 @@ static void send_response_to_client(int8_t *return_http_flag,
   char return_msg[1024];
   char *rendered = NULL;
   float cur_perc_finished = -1.0;
-  int cur_transcribe_status = -1;
-  cJSON *last_transcribe_json = NULL, *cur_transcribe_json = NULL;
-  audioapp_struct *cur_audioapp_data = restful_ptr->audioapp_data; 
+  int cur_classify_status = -1;
+  cJSON *last_classify_json = NULL, *cur_classify_json = NULL;
+  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data; 
 
   memset(return_msg, 0, sizeof(return_msg));		  
 
@@ -1046,14 +1006,14 @@ static void send_response_to_client(int8_t *return_http_flag,
     
   case HTTP_400:
 
-    if (cur_audioapp_data->restful_err_str) {
+    if (cur_classifyapp_data->restful_err_str) {
       sprintf(return_msg,
 	      "HTTP/1.1 %d %s\r\n"                       
 	      "Server: zipreel\r\n"
 	      "Date: Today\r\n"
 	      "Access-Control-Allow-Methods: GET, POST, DELETE\r\n",
-	      400, cur_audioapp_data->restful_err_str);		      
-      free_mem(cur_audioapp_data->restful_err_str);
+	      400, cur_classifyapp_data->restful_err_str);		      
+      free_mem(cur_classifyapp_data->restful_err_str);
     } else
       sprintf(return_msg,
 	      "HTTP/1.1 %d %s\r\n"                       
@@ -1154,7 +1114,7 @@ static void *restful_comm_thread_func(void *context)
     FD_SET(servsock, &sockset);
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 100000;
-    // syslog(LOG_INFO, "RESTFUL1: %d %d, %s", restful->is_restful_thread_active, __LINE__, __FILE__);
+    syslog(LOG_DEBUG, "RESTFUL1: %d %d, %s", restful->is_restful_thread_active, __LINE__, __FILE__);
 
     if (select(servsock + 1, &sockset, NULL, NULL, &select_timeout) != 0) {
 
@@ -1166,10 +1126,10 @@ static void *restful_comm_thread_func(void *context)
 	char content_type[128];
 
 	clientsock = accept(servsock, (struct sockaddr *)&clientaddr, &clientsize);
-	syslog(LOG_DEBUG,"= Received tcp request on port %d from %s:%d\n", 
-		restful->restful_server_port, 
-		inet_ntoa(clientaddr.sin_addr),
-		clientaddr.sin_port);
+	syslog(LOG_INFO,"= Received tcp request on port %d from %s:%d\n", 
+	       restful->restful_server_port, 
+	       inet_ntoa(clientaddr.sin_addr),
+	       clientaddr.sin_port);
 	// fprintf(stderr, "handling the request\n");
 	total_received = 0;
 	memset(receive_buffer, 0, sizeof(receive_buffer));
@@ -1193,13 +1153,13 @@ static void *restful_comm_thread_func(void *context)
 	// syslog(LOG_INFO, "HTTP_REQ_METHOD: %s RESPONSE: %d", cmd, http_response_status);	
 	send_response_to_client(&http_response_status, &json, &clientsock, &cmd[0], restful);
 
-	// Tell parent to start transcribe
+	// Tell parent to start classify
 	if ((!strcmp(cmd, "POST")) && (http_response_status == HTTP_201)) {
 	  igolgi_message_struct *dispatch_msg = (igolgi_message_struct*)malloc(sizeof(igolgi_message_struct));
 	  if (dispatch_msg) {
 	    memset(dispatch_msg, 0, sizeof(igolgi_message_struct));
 	    dispatch_msg->buffer_flags = http_response_status;
-	    syslog(LOG_DEBUG, "= Sending dispatch msg: %d", http_response_status);
+	    syslog(LOG_INFO, "= Sending dispatch msg: %d", http_response_status);
 	    message_queue_push_front(restful->dispatch_queue, dispatch_msg);
 	    dispatch_msg = NULL;
 	  }
@@ -1212,7 +1172,7 @@ static void *restful_comm_thread_func(void *context)
   return NULL;
 }    
 
-restful_comm_struct *restful_comm_create(audioapp_struct *audioapp_data, int *server_port)
+restful_comm_struct *restful_comm_create(classifyapp_struct *classifyapp_data, int *server_port)
 {
   restful_comm_struct *restful = (restful_comm_struct*)malloc(sizeof(restful_comm_struct));
 
@@ -1222,26 +1182,26 @@ restful_comm_struct *restful_comm_create(audioapp_struct *audioapp_data, int *se
 
   memset(restful, 0, sizeof(restful_comm_struct));
   
-  pthread_mutex_init(&restful->transcribe_info_lock, NULL);
+  pthread_mutex_init(&restful->classify_info_lock, NULL);
   pthread_mutex_init(&restful->thread_status_lock, NULL);
-  pthread_mutex_init(&restful->cur_transcribe_info.job_percent_complete_lock, NULL);
-  //pthread_mutex_init(&restful->mp4reader_active_lock, NULL);
-  pthread_mutex_init(&restful->cur_transcribe_info.job_status_lock, NULL);
-  pthread_mutex_init(&restful->audioapp_init_lock, NULL);
+  pthread_mutex_init(&restful->cur_classify_info.job_percent_complete_lock, NULL);
+  pthread_mutex_init(&restful->cur_classify_info.job_status_lock, NULL);
 
-  restful->transcribe_thread_status = TRANSCRIBE_THREAD_STATUS_IDLE;
+  // pthread_mutex_init(&restful->classifyapp_init_lock, NULL);
 
-  syslog(LOG_DEBUG, "CRASH FLAG: %d/%p | LINE: %d, %s", 
-	 (int)audioapp_data->appconfig.crash_recovery_flag, audioapp_data, __LINE__, __FILE__);
+  restful->classify_thread_status = CLASSIFY_THREAD_STATUS_IDLE;
 
-  restful->audioapp_data = audioapp_data;
+  //syslog(LOG_DEBUG, "CRASH FLAG: %d/%p | LINE: %d, %s", 
+  //(int)classifyapp_data->appconfig.crash_recovery_flag, classifyapp_data, __LINE__, __FILE__);
 
-  pthread_mutex_lock(&restful->audioapp_init_lock);
-  restful->audioapp_init = false;
-  pthread_mutex_unlock(&restful->audioapp_init_lock);
+  restful->classifyapp_data = classifyapp_data;
 
-  restful->cur_transcribe_info.transcribe_id = -1;
-  restful->cur_transcribe_info.transcribe_status = -1;
+  //pthread_mutex_lock(&restful->classifyapp_init_lock);
+  //restful->classifyapp_init = false;
+  //pthread_mutex_unlock(&restful->classifyapp_init_lock);
+
+  restful->cur_classify_info.classify_id = -1;
+  restful->cur_classify_info.classify_status = -1;
     
   restful->restful_server_port = *server_port;
 
@@ -1252,11 +1212,10 @@ int restful_comm_destroy(restful_comm_struct *restful)
 {
   if (restful) {
     pthread_mutex_destroy(&restful->thread_status_lock);
-    pthread_mutex_destroy(&restful->cur_transcribe_info.job_percent_complete_lock);
-    //pthread_mutex_destroy(&restful->mp4reader_active_lock);
-    pthread_mutex_destroy(&restful->cur_transcribe_info.job_status_lock);
-    pthread_mutex_destroy(&restful->transcribe_info_lock);
-    pthread_mutex_destroy(&restful->audioapp_init_lock);
+    pthread_mutex_destroy(&restful->cur_classify_info.job_percent_complete_lock);
+    pthread_mutex_destroy(&restful->cur_classify_info.job_status_lock);
+    pthread_mutex_destroy(&restful->classify_info_lock);
+    //pthread_mutex_destroy(&restful->classifyapp_init_lock);
 
     free(restful);
     restful = NULL;
@@ -1286,12 +1245,12 @@ int restful_comm_stop(restful_comm_struct *restful)
   return 0;
 }
 
-int restful_comm_thread_start(audioapp_struct *audioapp_data, restful_comm_struct **restful, void **dispatch_queue, int *server_port)
+int restful_comm_thread_start(classifyapp_struct *classifyapp_data, restful_comm_struct **restful, void **dispatch_queue, int *server_port)
 {
 
-  /* Create thread to listen to incoming HTTP requests to start/stop transcribes or get their status */
+  /* Create thread to listen to incoming HTTP requests to start/stop classifys or get their status */
   *dispatch_queue = (void*)message_queue_create();	
-  *restful = restful_comm_create(audioapp_data, server_port);
+  *restful = restful_comm_create(classifyapp_data, server_port);
   restful_comm_start(*restful, *dispatch_queue);
 
   return 0;
