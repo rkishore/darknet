@@ -550,7 +550,7 @@ static int store_config_info(cJSON **config_info, classifyapp_struct *classifyap
 static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, restful_comm_struct *restful)
 {
   char *out = NULL;
-  cJSON *input_data = NULL, *output_dir = NULL, *config_data = NULL, *output_fileprefix = NULL;
+  cJSON *input_data = NULL, *output_dir = NULL, *config_data = NULL, *output_fileprefix = NULL, *input_type_data = NULL;
   classifyapp_struct *cur_classifyapp_data = restful->classifyapp_data;
   int cur_classify_thread_status = -1;
 
@@ -563,11 +563,12 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 
     //fprintf(stderr,"decoding data:%s\n", lineptr);
     input_data = cJSON_GetObjectItem(*parsedjson, "input");
+    input_type_data = cJSON_GetObjectItem(*parsedjson, "type");
     output_dir = cJSON_GetObjectItem(*parsedjson, "output_dir");
     output_fileprefix = cJSON_GetObjectItem(*parsedjson, "output_fileprefix");
     // config_data = cJSON_GetObjectItem(*parsedjson, "config");
 
-    if ( (input_data == NULL) || 
+    if ( (input_data == NULL) || (input_type_data == NULL) ||
 	 (output_dir == NULL) || (output_fileprefix == NULL) ) {
 	 // || (config_data == NULL) ) {
       *return_http_flag = HTTP_400;
@@ -576,7 +577,10 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 
     if (store_input_loc(&input_data, cur_classifyapp_data, return_http_flag) < 0) 
       return -1;
-    
+
+    if (store_input_type(&input_type_data, cur_classifyapp_data, return_http_flag) < 0) 
+      return -1;    
+
     if (store_output_file_loc(&output_dir, &output_fileprefix, cur_classifyapp_data, return_http_flag) < 0) 
       return -1;
 
@@ -593,8 +597,9 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     restful->cur_classify_info.classify_status = CLASSIFY_STATUS_RUNNING;
     clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.start_timestamp);
 
-    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV | image_url: %s | output_directory: %s | output_fileprefix: %s\n", 
+    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV | image_url: %s (%s) | output_directory: %s | output_fileprefix: %s\n", 
 	   cur_classifyapp_data->appconfig.input_url,
+	   cur_classifyapp_data->appconfig.input_type,
 	   cur_classifyapp_data->appconfig.output_directory,
 	   cur_classifyapp_data->appconfig.output_fileprefix);
     
@@ -646,15 +651,19 @@ static void copy_to_global_config(restful_comm_struct *restful_ptr)
 
   memset(mod_config()->image_url, 0, LARGE_FIXED_STRING_SIZE);
   memcpy(mod_config()->image_url, classifyapp_info->appconfig.input_url, strlen(classifyapp_info->appconfig.input_url));
-      
+
+  memset(mod_config()->input_type, 0, SMALL_FIXED_STRING_SIZE);
+  memcpy(mod_config()->input_type, classifyapp_info->appconfig.input_type, strlen(classifyapp_info->appconfig.input_type));
+
   memset(mod_config()->output_directory, 0, LARGE_FIXED_STRING_SIZE);
   memcpy(mod_config()->output_directory, classifyapp_info->appconfig.output_directory, strlen(classifyapp_info->appconfig.output_directory));
 
   memset(mod_config()->output_fileprefix, 0, LARGE_FIXED_STRING_SIZE);
   memcpy(mod_config()->output_fileprefix, classifyapp_info->appconfig.output_fileprefix, strlen(classifyapp_info->appconfig.output_fileprefix));
 
-  syslog(LOG_DEBUG, "= COPIED DISPATCH_MSG | image_url: %s | output_directory: %s | output_fileprefix: %s\n", 
+  syslog(LOG_INFO, "= COPIED DISPATCH_MSG | image_url: %s (%s) | output_directory: %s | output_fileprefix: %s\n", 
 	 get_config()->image_url,
+	 get_config()->input_type,
 	 get_config()->output_directory,
 	 get_config()->output_fileprefix);
 

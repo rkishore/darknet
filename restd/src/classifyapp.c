@@ -105,6 +105,125 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
   return 0;
 }
 
+static int check_input_url(restful_comm_struct *restful_ptr) 
+{
+
+  int retval, txtcheck = -1;
+  
+  if (config_curl_and_pull_file_sample(restful_ptr->classifyapp_data) < 0)
+    {
+      syslog(LOG_ERR, "= Could not check file for file type");
+      return -1;
+    }    
+
+  txtcheck = system("/usr/bin/file /tmp/page.out | grep text");  
+
+  if (!txtcheck)
+    return -1;
+    
+  return 0;
+
+}
+
+static int check_output_dir(restful_comm_struct *restful_ptr) 
+{
+
+  // Check if directory exists 
+  if ( access(get_config()->output_directory, F_OK ) == -1 ) {
+    syslog(LOG_ERR, "= Output directory %s does not exist", get_config()->output_directory);
+    pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
+    restful_ptr->cur_classify_info.classify_status = HTTP_400;	
+    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
+    return -1;	  	
+  }
+
+  return 0;
+}
+
+static int check_input_file(restful_comm_struct *restful_ptr) 
+{
+
+  // Check if directory exists 
+  if ( access(get_config()->image_url, F_OK ) == -1 ) {
+    syslog(LOG_ERR, "= Input file %s does not exist", get_config()->image_url);
+    pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
+    restful_ptr->cur_classify_info.classify_status = HTTP_400;	
+    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
+    return -1;	  	
+  }
+
+  return 0;
+}
+
+/*
+static int check_config(restful_comm_struct *restful_ptr) 
+{
+
+  // Check if the file exists on local disk
+  if ( access(get_config()->acoustic_model, F_OK ) == -1 ) {    
+    syslog(LOG_ERR, "= Acoustic model %s not found at specified location", get_config()->acoustic_model);
+    pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
+    restful_ptr->cur_classify_info.classify_status = HTTP_400;	
+    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);
+    return -1;	  	
+  }
+
+  // Check if the file exists on local disk
+  if ( access(get_config()->dictionary, F_OK ) == -1 ) {
+    syslog(LOG_ERR, "= Dictionary %s not found at specified location", get_config()->dictionary);
+    pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
+    restful_ptr->cur_classify_info.classify_status = HTTP_400;	
+    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
+    return -1;	  	
+  }
+
+  // Check if the file exists on local disk
+  if ( access(get_config()->language_model, F_OK ) == -1 ) {	
+    syslog(LOG_ERR, "= Language_Model %s not found at specified location", get_config()->language_model);
+    pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
+    restful_ptr->cur_classify_info.classify_status = HTTP_400;	
+    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
+    return -1;	  	
+  }
+
+  return 0;
+
+}
+*/
+
+static int check_input_params_for_sanity(restful_comm_struct *restful_ptr) 
+{
+  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
+  
+  if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "stream")) && (check_input_url(restful_ptr) < 0))
+    {
+      syslog(LOG_ERR, "= Input URL invalid | line:%d, %s", __LINE__, __FILE__);
+      return -1;
+    }
+
+  if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "file")) && (check_input_file(restful_ptr) < 0))
+    {
+      syslog(LOG_ERR, "= Input FILE invalid | line:%d, %s", __LINE__, __FILE__);
+      return -1;
+    }
+
+  if (check_output_dir(restful_ptr) < 0)
+    {
+      syslog(LOG_ERR, "= Output directory does not exist | line:%d, %s", __LINE__, __FILE__);
+      return -1;
+    }
+
+  /* if (check_config(restful_ptr) < 0)
+    {
+      syslog(LOG_ERR, "= acoustic_model/dictionary/language_model does not exist | line:%d, %s", __LINE__, __FILE__);
+      return -1;
+    }
+  */
+  
+  return 0;
+
+}
+
 static void *restful_classify_thread_func(void *context)
 {
   restful_comm_struct *restful = (restful_comm_struct *)context;
@@ -145,12 +264,11 @@ static void *restful_classify_thread_func(void *context)
 	     classifyapp_info->appconfig.output_directory,
 	     classifyapp_info->appconfig.output_fileprefix);
 
-      /* 
       // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
       if (check_input_params_for_sanity(restful) == 0)
 	{
 	  // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
-	  copy_to_recovery_configfile(restful);
+	  // copy_to_recovery_configfile(restful);
 	  continue_after_params_parsing = true;
 	  // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
 	}
@@ -162,7 +280,6 @@ static void *restful_classify_thread_func(void *context)
 	  pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
 	  clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
 	} 
-      */
       
       done_handling_req = 1;
 	

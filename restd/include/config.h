@@ -22,6 +22,7 @@ struct Config
   char           image_url[LARGE_FIXED_STRING_SIZE];
   char           output_directory[LARGE_FIXED_STRING_SIZE];
   char           output_fileprefix[LARGE_FIXED_STRING_SIZE];
+  char           input_type[SMALL_FIXED_STRING_SIZE];
   
 };
 

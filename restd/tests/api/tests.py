@@ -25,6 +25,7 @@ parser.add_argument('--testdelete', help="Use this to test HTTP DELETE. Provide 
 values_json_dict = { 
     "vehicle1": {
         "input": "http://li1249-5.members.linode.com:8080/output/Car1.png",
+        "type": "stream",
         "output_dir": "/tmp",
         "output_fileprefix": "TEST1",
         "config": {
