@@ -33,6 +33,53 @@ static int restful_done_handling_req = 0;
 
 classifyapp_struct classifyapp_inst;
 
+static int stop_classifyapp_config(classifyapp_struct *classifyapp_data)
+{
+  bool audio_thread_complete = false, speech_thread_complete = false;
+
+  // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
+
+  classifyapp_data->proc_thread_is_active = 0;
+  classifyapp_data->input_thread_is_active = 0;
+
+  // pthread_join(classifyapp_data->proc_thread_id, NULL);
+
+  // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
+
+  pthread_join(classifyapp_data->input_thread_id, NULL);
+
+
+  //fast_buffer_pool_destroy(classifyapp_data->system_message_pool);
+  //classifyapp_data->system_message_pool = NULL;
+
+  pthread_mutex_destroy(&classifyapp_data->http_input_thread_complete_mutex);
+
+  /* while (speech_thread_complete == false) 
+    {
+      pthread_mutex_lock(&classifyapp_data->speech_proc_thread_complete_mutex);
+      speech_thread_complete = classifyapp_data->speech_proc_thread_complete;
+      pthread_mutex_unlock(&classifyapp_data->speech_proc_thread_complete_mutex);
+      usleep(50000);
+    }
+
+  pthread_mutex_destroy(&classifyapp_data->speech_proc_thread_complete_mutex);
+  */
+  
+  /* if (classifyapp_data->event_message_queue) {
+    message_queue_destroy(classifyapp_data->event_message_queue);
+    classifyapp_data->event_message_queue = NULL;
+  }
+  if (classifyapp_data->event_message_pool) {
+    buffer_pool_destroy(classifyapp_data->event_message_pool);
+    classifyapp_data->event_message_pool = NULL;
+  }
+  */
+  
+  // remove_files_used_to_recover_from_crash();  
+
+  return 0;
+}
+
 static int start_classifyapp_config(restful_comm_struct *restful_data)
 {
   int retval, sval1, sval2;
@@ -44,12 +91,6 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
   classifyapp_data->proc_thread_is_active = 1;
   classifyapp_data->input_thread_is_active = 1;
 
-  // Message queue and packet semaphores between http_puller thread and audio_decoder thread
-  classifyapp_data->input_queue_sem = (sem_t*)malloc(sizeof(sem_t));
-  classifyapp_data->input_packet_sem = (sem_t*)malloc(sizeof(sem_t));
-  sem_init(classifyapp_data->input_queue_sem, 0, 0);
-  sem_init(classifyapp_data->input_packet_sem, 0, MAX_PACKETS);
-
   // Message queue and packet semaphores between audio_decoder thread and speech_processing thread
   /*classifyapp_data->speech_proc_queue_sem = (sem_t*)malloc(sizeof(sem_t));
   classifyapp_data->speech_proc_packet_sem = (sem_t*)malloc(sizeof(sem_t));
@@ -57,12 +98,6 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
   sem_init(classifyapp_data->speech_proc_packet_sem, 0, MAX_PACKETS);
   */
   
-#ifdef SELF_PULL
-  // Message queue and packet buffer pool between http_puller thread and audio_decoder thread
-  classifyapp_data->input_packet_queue = (void*)message_queue_create();
-  classifyapp_data->input_packet_buffer_pool = (void*)fast_buffer_pool_create(MAX_PACKETS, MAX_PACKET_SIZE);
-#endif
-
   /*
   // Message queue and packet buffer pool between audio_decoder thread and speech_processing thread
   classifyapp_data->speech_proc_packet_queue = (void*)message_queue_create();
@@ -70,10 +105,10 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
   */
   
   // Common buffer pool for http_puller thread & audio_decoder thread
-  classifyapp_data->system_message_pool = (void*)fast_buffer_pool_create(MAX_PACKETS * NUM_PROC_THREADS, sizeof(igolgi_message_struct));
+  // classifyapp_data->system_message_pool = (void*)fast_buffer_pool_create(MAX_PACKETS * NUM_PROC_THREADS, sizeof(igolgi_message_struct));
 
 #ifdef SELF_PULL
-  classifyapp_data->audio_decoder_buffer_pool = (void*)fast_buffer_pool_create(1, MAX_PACKET_SIZE*2);
+  // classifyapp_data->audio_decoder_buffer_pool = (void*)fast_buffer_pool_create(1, MAX_PACKET_SIZE*2);
   pthread_mutex_init(&classifyapp_data->http_input_thread_complete_mutex, NULL);
   classifyapp_data->http_input_thread_complete = false;
 #endif
@@ -85,11 +120,11 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
   classifyapp_data->speech_proc_thread_complete = false;
   */
   
-  classifyapp_data->event_message_queue = (void*)message_queue_create();
-  classifyapp_data->event_message_pool = (void*)buffer_pool_create(MAX_EVENT_BUFFERS, MAX_EVENT_SIZE, 1);  
+  //classifyapp_data->event_message_queue = (void*)message_queue_create();
+  //classifyapp_data->event_message_pool = (void*)buffer_pool_create(MAX_EVENT_BUFFERS, MAX_EVENT_SIZE, 1);  
   
   // Thread that pulls from URL
-  /* retval = pthread_create(&classifyapp_data->input_thread_id, NULL, http_input_thread_func, (void*)classifyapp_data);
+  retval = pthread_create(&classifyapp_data->input_thread_id, NULL, http_input_thread_func, (void*)classifyapp_data);
   if (retval < 0) {
 
     classifyapp_data->proc_thread_is_active = 0;
@@ -100,8 +135,7 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
     return -1;
 
   } 
-  */
-  
+    
   return 0;
 }
 
@@ -312,9 +346,11 @@ static void *restful_classify_thread_func(void *context)
       pthread_mutex_unlock(&classifyapp_info->speech_proc_thread_complete_mutex);
       */
       
-      if ( (input_thread_done) && (audio_decoder_thread_done) && (proc_thread_done) )
+      //if ( (input_thread_done) && (audio_decoder_thread_done) && (proc_thread_done) )
+      // break;
+      if (input_thread_done)
 	break;
-
+      
       /* pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
       cur_classify_status = restful->cur_classify_info.classify_status;
       pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
@@ -358,11 +394,10 @@ static void *restful_classify_thread_func(void *context)
 		 cur_classify_status);
     */
 
-    /*
+    
     // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
     stop_classifyapp_config(classifyapp_info);
-    */
-    
+        
     syslog(LOG_INFO, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
     clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
       
@@ -434,9 +469,9 @@ int main(int argc, char **argv)
  wait_for_exit:
   while(1)
     {
-      pthread_mutex_lock(&classifyapp_inst.http_input_thread_complete_mutex);
-      input_thread_done = classifyapp_inst.http_input_thread_complete;
-      pthread_mutex_unlock(&classifyapp_inst.http_input_thread_complete_mutex);
+      //pthread_mutex_lock(&classifyapp_inst.http_input_thread_complete_mutex);
+      //input_thread_done = classifyapp_inst.http_input_thread_complete;
+      //pthread_mutex_unlock(&classifyapp_inst.http_input_thread_complete_mutex);
 
       if (input_thread_done)
 	break;
