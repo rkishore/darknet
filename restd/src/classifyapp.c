@@ -32,6 +32,42 @@ static void *restful_dispatch_queue = NULL;
 static int restful_done_handling_req = 0;
 
 classifyapp_struct classifyapp_inst;
+struct sigaction sa;
+
+void handle_signal(int signal)
+{
+  const char *signal_name;
+  sigset_t pending;
+
+  // Find out which signal we're handling
+  switch (signal) {
+  case SIGHUP:
+    signal_name = "SIGHUP";
+    break;
+  case SIGUSR1:
+    signal_name = "SIGUSR1";
+    break;
+  case SIGINT:
+    //printf("Caught SIGINT, exiting now\n");
+    break;
+    //exit(0);
+  default:
+    fprintf(stderr, "Caught wrong signal: %d\n", signal);
+    return;
+  }
+
+  if (restful_struct)
+    {
+      restful_struct->is_classify_thread_active = 0;
+      message_queue_push_front(restful_struct->dispatch_queue, NULL);
+      restful_struct->is_restful_thread_active = 0;
+    }
+  
+  //printf("Done handling %s - wait for app to quit\n\n", signal_name);
+  return;
+  
+}
+
 
 static int stop_classifyapp_config(classifyapp_struct *classifyapp_data)
 {
@@ -413,6 +449,7 @@ int restful_classify_thread_start(restful_comm_struct *restful)
 {
   if (restful) {
     restful->is_classify_thread_active = 1;
+    syslog(LOG_INFO, "= Creating classify_thread");
     pthread_create(&restful->classify_thread_id, NULL, restful_classify_thread_func, (void*)restful);
   }
   return 0;
@@ -425,6 +462,7 @@ int restful_classify_thread_stop(restful_comm_struct *restful)
     message_queue_push_front(restful->dispatch_queue, NULL);
     pthread_join(restful->classify_thread_id, NULL);
   }
+  
   return 0;
 }
 
@@ -458,7 +496,29 @@ int main(int argc, char **argv)
 
   // Thread to pull and classify files when requested by clients
   restful_classify_thread_start(restful_struct);
-  
+
+  // Setup the sighub handler
+  sa.sa_handler = &handle_signal;
+
+  // Restart the system call, if at all possible
+  sa.sa_flags = SA_RESTART;
+
+  // Block every signal during the handler
+  sigfillset(&sa.sa_mask);
+
+  // Intercept SIGHUP and SIGINT
+  if (sigaction(SIGHUP, &sa, NULL) == -1) {
+    perror("Error: cannot handle SIGHUP"); // Should not happen
+  }
+
+  if (sigaction(SIGUSR1, &sa, NULL) == -1) {
+    perror("Error: cannot handle SIGUSR1"); // Should not happen
+  }
+
+  if (sigaction(SIGINT, &sa, NULL) == -1) {
+    perror("Error: cannot handle SIGINT"); // Should not happen
+  }
+
   /*
   if (start_classifyapp_config(restful_struct) < 0) {
     DEBUG_PRINTF("Could not configure classifyapp! Exiting!\n");
@@ -467,18 +527,12 @@ int main(int argc, char **argv)
   */
 
  wait_for_exit:
-  while(1)
-    {
-      //pthread_mutex_lock(&classifyapp_inst.http_input_thread_complete_mutex);
-      //input_thread_done = classifyapp_inst.http_input_thread_complete;
-      //pthread_mutex_unlock(&classifyapp_inst.http_input_thread_complete_mutex);
 
-      if (input_thread_done)
-	break;
-
-      usleep(100000);
-    }
-
+  
+  pthread_join(restful_struct->classify_thread_id, NULL);
+  pthread_join(restful_struct->restful_server_thread_id, NULL);
+  message_queue_destroy(restful_struct->dispatch_queue);
+  
   syslog(LOG_INFO, "= CLASSIFYAPP DONE FOR URL: %s | processed: %0.0f bytes\n",
 	 get_config()->image_url, classifyapp_inst.bytes_processed);
   

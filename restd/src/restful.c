@@ -1178,6 +1178,7 @@ static void *restful_comm_thread_func(void *context)
     }
   }
   close(servsock);
+  syslog(LOG_INFO, "= Leaving restful_thread, line:%d, %s", __LINE__, __FILE__);
   return NULL;
 }    
 
@@ -1238,6 +1239,7 @@ int restful_comm_start(restful_comm_struct *restful, void *dispatch_queue)
   if (restful) {
     restful->is_restful_thread_active = 1;
     restful->dispatch_queue = dispatch_queue;
+    syslog(LOG_INFO, "= Creating restful_thread");
     pthread_create(&restful->restful_server_thread_id, NULL, restful_comm_thread_func, (void*)restful);
   }
   return 0;
@@ -1247,7 +1249,7 @@ int restful_comm_stop(restful_comm_struct *restful)
 {
   if (restful) {
     restful->is_restful_thread_active = 0;
-    syslog(LOG_INFO, "RESTFUL2: %d %d, %s", restful->is_restful_thread_active, __LINE__, __FILE__);
+    syslog(LOG_INFO, "RESTFUL_COMM_STOP: %d %d, %s", restful->is_restful_thread_active, __LINE__, __FILE__);
     pthread_join(restful->restful_server_thread_id, NULL);
     message_queue_destroy(restful->dispatch_queue);
   }
