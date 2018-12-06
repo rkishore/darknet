@@ -90,3 +90,14 @@ void **list_to_array(list *l)
     }
     return a;
 }
+
+int get_list_len(list *l)
+{
+    int count = 0;
+    node *n = l->front;
+    while(n){
+      count++;
+      n = n->next;
+    }
+    return count;
+}

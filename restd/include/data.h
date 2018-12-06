@@ -47,4 +47,6 @@ data *split_data(data d, int part, int total);
 data concat_datas(data *d, int n);
 void fill_truth(char *path, char **labels, int k, float *truth);
 
+int get_num_labels(char *filename);
+  
 #endif

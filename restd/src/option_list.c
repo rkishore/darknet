@@ -8,7 +8,7 @@ list *read_data_cfg(char *filename)
 {
     FILE *file = fopen(filename, "r");
     if(file == 0) file_error(filename);
-    char *line;
+    char *line = NULL;
     int nu = 0;
     list *options = make_list();
     while((line=fgetl(file)) != 0){
@@ -19,12 +19,14 @@ list *read_data_cfg(char *filename)
             case '#':
             case ';':
                 free(line);
+		line = NULL;
                 break;
             default:
                 if(!read_option(line, options)){
                     fprintf(stderr, "Config file error line %d, could parse: %s\n", nu, line);
-                    free(line);
-                }
+		    free(line);
+		    line = NULL;
+		}
                 break;
         }
     }

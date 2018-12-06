@@ -28,11 +28,7 @@
 #define MAX_PACKETS 10 // to support processing ~10X slower than incoming stream rate/bandwidth
 #define MAX_PACKET_SIZE 64*1024 
 #define BASIC_PROC_BUFFER 30.1 // how many seconds of data we should process at a time
-//#define MAX_WAV_PACKET_SIZE (256000/8) * BASIC_PROC_BUFFER // For 256Kbps compressed input stream rate/bandwidth, 30s of data = 256000/8 * 30
 #define MAX_WAV_PACKET_SIZE 1024*1024 // For 256Kbps compressed input stream rate/bandwidth, 30s of data =~ 1MB of data
-
-// #define MAX_PROC_BUFSIZE 1024*1024 // For 256Kbps input stream rate/bandwidth and 30s of data
-// #define MAX_PROC_BUFS 10 
 
 #define NUM_PROC_THREADS 2 // the audio_decoder and the speech_processing thread
 #define NANOSEC 1000000000
@@ -76,7 +72,8 @@ typedef struct _classifyapp_config_struct_ {
   //char language_model[LARGE_FIXED_STRING_SIZE];
   //float writeout_duration;
   //bool crash_recovery_flag;
-
+  char input_filename[LARGE_FIXED_STRING_SIZE];
+  
 } classifyapp_config_struct;
 
 /* 

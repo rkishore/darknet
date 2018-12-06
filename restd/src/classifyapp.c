@@ -38,7 +38,7 @@ struct sigaction sa;
 
 void handle_signal(int signal)
 {
-  const char *signal_name;
+  const char *signal_name = NULL;
   // sigset_t pending;
 
   // Find out which signal we're handling
@@ -64,13 +64,15 @@ void handle_signal(int signal)
       message_queue_push_front(restful_struct->dispatch_queue, NULL);
       restful_struct->is_restful_thread_active = 0;
     }
-  
-  //printf("Done handling %s - wait for app to quit\n\n", signal_name);
+
+  if (signal_name != NULL)
+    syslog(LOG_DEBUG, "= Done handling %s - wait for app to quit", signal_name);
   return;
   
 }
 
 
+/* 
 static int stop_classifyapp_config(classifyapp_struct *classifyapp_data)
 {
   // bool audio_thread_complete = false, speech_thread_complete = false;
@@ -91,27 +93,15 @@ static int stop_classifyapp_config(classifyapp_struct *classifyapp_data)
   //classifyapp_data->system_message_pool = NULL;
 
   pthread_mutex_destroy(&classifyapp_data->http_input_thread_complete_mutex);
-
-  /* while (speech_thread_complete == false) 
-    {
-      pthread_mutex_lock(&classifyapp_data->speech_proc_thread_complete_mutex);
-      speech_thread_complete = classifyapp_data->speech_proc_thread_complete;
-      pthread_mutex_unlock(&classifyapp_data->speech_proc_thread_complete_mutex);
-      usleep(50000);
-    }
-
-  pthread_mutex_destroy(&classifyapp_data->speech_proc_thread_complete_mutex);
-  */
   
-  /* if (classifyapp_data->event_message_queue) {
-    message_queue_destroy(classifyapp_data->event_message_queue);
-    classifyapp_data->event_message_queue = NULL;
-  }
-  if (classifyapp_data->event_message_pool) {
-    buffer_pool_destroy(classifyapp_data->event_message_pool);
-    classifyapp_data->event_message_pool = NULL;
-  }
-  */
+  //if (classifyapp_data->event_message_queue) {
+  //  message_queue_destroy(classifyapp_data->event_message_queue);
+  //  classifyapp_data->event_message_queue = NULL;
+  //}
+  //if (classifyapp_data->event_message_pool) {
+  //  buffer_pool_destroy(classifyapp_data->event_message_pool);
+  //  classifyapp_data->event_message_pool = NULL;
+  //}
   
   // remove_files_used_to_recover_from_crash();  
 
@@ -130,20 +120,19 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
   classifyapp_data->input_thread_is_active = 1;
 
   // Message queue and packet semaphores between audio_decoder thread and speech_processing thread
-  /*classifyapp_data->speech_proc_queue_sem = (sem_t*)malloc(sizeof(sem_t));
-  classifyapp_data->speech_proc_packet_sem = (sem_t*)malloc(sizeof(sem_t));
-  sem_init(classifyapp_data->speech_proc_queue_sem, 0, 0);
-  sem_init(classifyapp_data->speech_proc_packet_sem, 0, MAX_PACKETS);
-  */
+  //classifyapp_data->speech_proc_queue_sem = (sem_t*)malloc(sizeof(sem_t));
+  //classifyapp_data->speech_proc_packet_sem = (sem_t*)malloc(sizeof(sem_t));
+  //sem_init(classifyapp_data->speech_proc_queue_sem, 0, 0);
+  //sem_init(classifyapp_data->speech_proc_packet_sem, 0, MAX_PACKETS);
+    
   
-  /*
   // Message queue and packet buffer pool between audio_decoder thread and speech_processing thread
-  classifyapp_data->speech_proc_packet_queue = (void*)message_queue_create();
-  classifyapp_data->speech_proc_packet_buffer_pool = (void*)fast_buffer_pool_create(MAX_PACKETS, MAX_WAV_PACKET_SIZE);
-  */
+  //classifyapp_data->speech_proc_packet_queue = (void*)message_queue_create();
+  //classifyapp_data->speech_proc_packet_buffer_pool = (void*)fast_buffer_pool_create(MAX_PACKETS, MAX_WAV_PACKET_SIZE);
   
   // Common buffer pool for http_puller thread & audio_decoder thread
   // classifyapp_data->system_message_pool = (void*)fast_buffer_pool_create(MAX_PACKETS * NUM_PROC_THREADS, sizeof(igolgi_message_struct));
+
 
 #ifdef SELF_PULL
   // classifyapp_data->audio_decoder_buffer_pool = (void*)fast_buffer_pool_create(1, MAX_PACKET_SIZE*2);
@@ -151,16 +140,15 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
   classifyapp_data->http_input_thread_complete = false;
 #endif
 
-  /*
-  pthread_mutex_init(&classifyapp_data->audio_decoder_thread_complete_mutex, NULL);
-  pthread_mutex_init(&classifyapp_data->speech_proc_thread_complete_mutex, NULL);
-  classifyapp_data->audio_decoder_thread_complete = false;
-  classifyapp_data->speech_proc_thread_complete = false;
-  */
+  //pthread_mutex_init(&classifyapp_data->audio_decoder_thread_complete_mutex, NULL);
+  //pthread_mutex_init(&classifyapp_data->speech_proc_thread_complete_mutex, NULL);
+  //classifyapp_data->audio_decoder_thread_complete = false;
+  //classifyapp_data->speech_proc_thread_complete = false;
   
   //classifyapp_data->event_message_queue = (void*)message_queue_create();
   //classifyapp_data->event_message_pool = (void*)buffer_pool_create(MAX_EVENT_BUFFERS, MAX_EVENT_SIZE, 1);  
-  
+
+
   // Thread that pulls from URL
   retval = pthread_create(&classifyapp_data->input_thread_id, NULL, http_input_thread_func, (void*)classifyapp_data);
   if (retval < 0) {
@@ -176,6 +164,7 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
     
   return 0;
 }
+*/
 
 static int check_input_url(restful_comm_struct *restful_ptr) 
 {
@@ -405,7 +394,7 @@ static void *restful_classify_thread_func(void *context)
     test_detector("/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
 		  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
 		  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
-		  "/tmp/dog.jpg",
+		  restful->classifyapp_data->appconfig.input_filename,
 		  0.5,
 		  .5,
 		  "/tmp/predictions.png",
@@ -501,9 +490,6 @@ int main(int argc, char **argv)
     exit(-1);
   }
   */
-
- wait_for_exit:
-
   
   pthread_join(restful_struct->classify_thread_id, NULL);
   pthread_join(restful_struct->restful_server_thread_id, NULL);

@@ -117,17 +117,10 @@ static size_t write_full_file(void *ptr, size_t size, size_t nmemb, void *userp)
 int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
 {
   
-  // char *pat_pmt_range_str = NULL;
   int retval = 0;
-  // u64 end_byte_range = 0;
-  // char *json_str = NULL;
-  char *samplefilename = NULL;
 
-  if (asprintf(&samplefilename, "/tmp/%s", basename(get_config()->image_url)) < 0)
-    {
-      syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
-      return -1;
-    }
+  memset(classifyapp_data->appconfig.input_filename, 0, LARGE_FIXED_STRING_SIZE);
+  snprintf(classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "/tmp/%s", basename(get_config()->image_url));
 
   // Initialization
   classifyapp_data->bytes_pulled = 0;
@@ -173,7 +166,7 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
   curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_WRITEFUNCTION, write_full_file);
 
   /* open the file */
-  classifyapp_data->samplefptr = fopen((const char *)samplefilename, "wb");
+  classifyapp_data->samplefptr = fopen((const char *)classifyapp_data->appconfig.input_filename, "wb");
   if(classifyapp_data->samplefptr) {
   
     /* we pass our 'chunk' struct to the callback function */
@@ -186,11 +179,8 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
     syslog(LOG_INFO, "= Done pulling from URL and writing sample file: %s", get_config()->image_url);
 
   } else {
-    syslog(LOG_ERR, "= Could not open %s and pull data to it, line:%d, %s", samplefilename, __LINE__, __FILE__);
+    syslog(LOG_ERR, "= Could not open %s and pull data to it, line:%d, %s", classifyapp_data->appconfig.input_filename, __LINE__, __FILE__);
   }
-
-  free(samplefilename);
-  samplefilename = NULL;
 
   curl_easy_cleanup(classifyapp_data->curl_data);
 

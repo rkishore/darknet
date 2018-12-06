@@ -10,4 +10,6 @@ void list_insert(list *, void *);
 
 void free_list_contents(list *l);
 
+int get_list_len(list *l);
+  
 #endif

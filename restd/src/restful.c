@@ -69,6 +69,7 @@ static int open_tcp_server_socket(int port)
     return sock;
 }
 
+/*
 static int open_tcp_socket(const char *address, int src_port, int dest_port)
 {
     int sock;
@@ -132,6 +133,7 @@ static int open_tcp_socket(const char *address, int src_port, int dest_port)
 
     return sock;
 }
+*/
 
 int close_tcp_socket(int sock)
 {
@@ -165,6 +167,7 @@ int write_tcp_socket(int sock, const unsigned char *buf, int count)
     return -1;
 }
 
+/*
 static int read_tcp_socket(int sock, unsigned char *buf, int count)
 { 
     int retval;    
@@ -191,7 +194,9 @@ static int read_tcp_socket(int sock, unsigned char *buf, int count)
     }
     return -1;
 }
+*/
 
+/*
 static int read_tcp_socket_complete(int sock, unsigned char *buf, int count)
 {
     int bytes_read = 0;
@@ -208,6 +213,7 @@ static int read_tcp_socket_complete(int sock, unsigned char *buf, int count)
     } 
     return bytes_read;
 }
+*/
 
 char *file_extension(char *filename) {
     char *ext = NULL;

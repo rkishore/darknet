@@ -173,6 +173,7 @@ cleanup_and_exit()
 
 }
 
+/*
 static int 
 job_control_init() 
 {
@@ -182,7 +183,7 @@ job_control_init()
   
   pid_t shell_pgid;
 
-  /* See if we are running interactively.  */
+  // See if we are running interactively.  
   shell_terminal = STDIN_FILENO;
   shell_is_interactive = isatty (shell_terminal);
 
@@ -191,11 +192,11 @@ job_control_init()
   if (shell_is_interactive) 
     {
 
-      /* Loop until we are in the foreground.  */
+      // Loop until we are in the foreground.  
       while (tcgetpgrp (shell_terminal) != (shell_pgid = getpgrp ()))
 	kill (- shell_pgid, SIGTTIN);
      
-      /* Ignore interactive and job-control signals.  */
+      // Ignore interactive and job-control signals.  
       //signal (SIGINT, SIG_IGN);
       signal (SIGQUIT, SIG_IGN);
       signal (SIGTSTP, SIG_IGN);
@@ -203,7 +204,7 @@ job_control_init()
       signal (SIGTTOU, SIG_IGN);
       signal (SIGCHLD, SIG_IGN);
      
-      /* Put ourselves in our own process group.  */
+      // Put ourselves in our own process group.  
       shell_pgid = getpid ();
       if (setpgid (shell_pgid, shell_pgid) < 0)
 	{
@@ -211,7 +212,7 @@ job_control_init()
 	  return -1;
 	}
      
-      /* Grab control of the terminal.  */
+      // Grab control of the terminal.  
       if (tcsetpgrp (shell_terminal, shell_pgid) < 0) 
 	{
 	  syslog (LOG_ERR, "Could not grab control of the terminal: %s\n", strerror(errno));
@@ -222,6 +223,7 @@ job_control_init()
   
   return 0;
 }
+*/
 
 void 
 basic_initialization(int *argc, char **argv, char *identity)
