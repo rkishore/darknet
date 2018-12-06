@@ -209,12 +209,6 @@ static int read_tcp_socket_complete(int sock, unsigned char *buf, int count)
     return bytes_read;
 }
 
-bool starts_with(const char *pre, const char *str)
-{
-  size_t lenpre = strlen(pre), lenstr = strlen(str);
-  return lenstr < lenpre ? false : strncmp(pre, str, lenpre) == 0;
-}
-
 char *file_extension(char *filename) {
     char *ext = NULL;
     ext = strrchr(filename, '.');
@@ -701,7 +695,7 @@ static int parse_input_request_data(uint32_t **input_request_data,
     
     if ( !strcmp(http_method, "POST") ) {
       
-      syslog(LOG_INFO, "%s %s | restful_ptr: %p", http_method, uri, restful_ptr);
+      syslog(LOG_INFO, "= %s %s | restful_ptr: %p", http_method, uri, restful_ptr);
 
       lineptr = strstr((const char *)*input_request_data, "\r\n\r\n");
       if (!lineptr) {      
@@ -762,13 +756,13 @@ static int parse_input_request_data(uint32_t **input_request_data,
     } else if (!strcmp(http_method, "DELETE")) {
 
       sscanf((const char *)uri, "/api/v0/classify/%d", &classify_id);
-      syslog(LOG_INFO, "DELETE %s | classify_id: %d", uri, classify_id);
+      syslog(LOG_INFO, "= DELETE %s | classify_id: %d", uri, classify_id);
 
       //if (classify_id == restful_ptr->cur_classify_info.classify_id) {
       handle_delete_request(return_http_flag, restful_ptr);
 
       if (*return_http_flag == HTTP_204) {
-	syslog(LOG_INFO, "Setting end_timestamp | %p | %d, %s", restful_ptr, __LINE__, __FILE__);
+	syslog(LOG_INFO, "= Setting end_timestamp | %p | %d, %s", restful_ptr, __LINE__, __FILE__);
 	clock_gettime(CLOCK_REALTIME, &restful_ptr->cur_classify_info.end_timestamp);
       }
 
@@ -1253,7 +1247,7 @@ int restful_comm_stop(restful_comm_struct *restful)
 {
   if (restful) {
     restful->is_restful_thread_active = 0;
-    syslog(LOG_INFO, "RESTFUL_COMM_STOP: %d %d, %s", restful->is_restful_thread_active, __LINE__, __FILE__);
+    syslog(LOG_INFO, "= RESTFUL_COMM_STOP: %d %d, %s", restful->is_restful_thread_active, __LINE__, __FILE__);
     pthread_join(restful->restful_server_thread_id, NULL);
     message_queue_destroy(restful->dispatch_queue);
   }

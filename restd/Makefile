@@ -24,7 +24,7 @@ DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 #_OBJS = fastpool.o threadqueue.o config.o serialnum.o init.o dfxp.o allocator.o pool.o comm.o udpcomm.o cjson.o restful.o classifyapp.o
 #_OBJS = fastpool.o threadqueue.o config.o serialnum.o init.o allocator.o pool.o comm.o udpcomm.o cjson.o puller.o restful.o classifyapp.o
-_OBJS = fastpool.o threadqueue.o config.o serialnum.o init.o cjson.o puller.o restful.o classifyapp.o
+_OBJS = common.o fastpool.o threadqueue.o config.o serialnum.o init.o cjson.o puller.o restful.o classifyapp.o
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 
 $(ODIR)/%.o: $(SRC)/%.c $(DEPS)

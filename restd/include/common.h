@@ -245,4 +245,7 @@ typedef struct _speech_proc_hyp_struct_ {
 
 #define __PRINTF(fmt, args...) { fprintf(stdout, fmt , ## args); fflush(stdout); }
 #define DEBUG_PRINTF(fmt, args...) __PRINTF(fmt , ## args)
+
+bool starts_with(const char *pre, const char *str);
+bool ends_with(const char *suf, const char *str);
 //#define CLASSIFYAPP_DEBUG

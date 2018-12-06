@@ -22,6 +22,7 @@
 #include "udpcomm.h"
 #include "comm.h"
 #include "restful.h"
+#include "common.h"
 
 #define APP_VERSION_MAJOR    1
 #define APP_VERSION_MINOR    0
@@ -179,6 +180,7 @@ static int check_input_url(restful_comm_struct *restful_ptr)
 {
 
   int retval, txtcheck = -1;
+  char *samplefilename = NULL, *filecmd = NULL;
   
   if (config_curl_and_pull_file_sample(restful_ptr->classifyapp_data) < 0)
     {
@@ -186,11 +188,37 @@ static int check_input_url(restful_comm_struct *restful_ptr)
       return -1;
     }    
 
-  txtcheck = system("/usr/bin/file /tmp/page.out | grep text");  
+  if (asprintf(&samplefilename, "/tmp/%s", basename(get_config()->image_url)) < 0)
+    {
+      syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
+      return -1;
+    }
+  
+  if (asprintf(&filecmd, "/usr/bin/file %s | grep text", samplefilename) < 0)
+    {
+      syslog(LOG_ERR, "= Could not asprintf filecmd, %s:%d", __FILE__, __LINE__);
+      free(samplefilename);
+      samplefilename = NULL;
+      return -1;
+    }
 
+  txtcheck = system(filecmd);  
+
+  free(samplefilename);
+  samplefilename = NULL;
+  
+  free(filecmd);
+  filecmd = NULL;
+  
   if (!txtcheck)
     return -1;
-    
+
+  if ( !( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) ) )
+    {
+      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+      return -1;
+    }
+  
   return 0;
 
 }
@@ -358,7 +386,7 @@ static void *restful_classify_thread_func(void *context)
     if (!restful->is_classify_thread_active)
       break;
   
-    syslog(LOG_INFO, "continue? %d | %d, %s", continue_after_params_parsing, __LINE__, __FILE__);
+    syslog(LOG_INFO, "= Continue? %d | %d, %s", continue_after_params_parsing, __LINE__, __FILE__);
     if (continue_after_params_parsing == false)
       continue;      
     

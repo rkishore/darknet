@@ -121,7 +121,13 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
   int retval = 0;
   u64 end_byte_range = 0;
   char *json_str = NULL;
-  static const char *samplefilename = "/tmp/page.out";
+  char *samplefilename = NULL;
+
+  if (asprintf(&samplefilename, "/tmp/%s", basename(get_config()->image_url)) < 0)
+    {
+      syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
+      return -1;
+    }
 
   // Initialization
   classifyapp_data->bytes_pulled = 0;
@@ -166,8 +172,8 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
   /* send all data to this function  */ 
   curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_WRITEFUNCTION, write_full_file);
 
-  /* open the file */ 
-  classifyapp_data->samplefptr = fopen(samplefilename, "wb");
+  /* open the file */
+  classifyapp_data->samplefptr = fopen((const char *)samplefilename, "wb");
   if(classifyapp_data->samplefptr) {
   
     /* we pass our 'chunk' struct to the callback function */
@@ -182,6 +188,9 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
   } else {
     syslog(LOG_ERR, "= Could not open %s and pull data to it, line:%d, %s", samplefilename, __LINE__, __FILE__);
   }
+
+  free(samplefilename);
+  samplefilename = NULL;
 
   curl_easy_cleanup(classifyapp_data->curl_data);
 
@@ -200,8 +209,14 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
   int retval = 0;
   u64 end_byte_range = 0;
   char *json_str = NULL;
-  static const char *samplefilename = "/tmp/page.out";
+  char *samplefilename = NULL;
 
+  if (asprintf(&samplefilename, "/tmp/%s", basename(get_config()->image_url)) < 0)
+    {
+      syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
+      return -1;
+    }
+  
   // Initialization
   classifyapp_data->bytes_pulled = 0;
 
@@ -245,8 +260,8 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
   /* send all data to this function  */ 
   curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_WRITEFUNCTION, write_file);
 
-  /* open the file */ 
-  classifyapp_data->samplefptr = fopen(samplefilename, "wb");
+  /* open the file */
+  classifyapp_data->samplefptr = fopen((const char *)samplefilename, "wb");
   if(classifyapp_data->samplefptr) {
   
     /* we pass our 'chunk' struct to the callback function */
@@ -262,6 +277,9 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
     syslog(LOG_ERR, "= Could not open %s and pull data to it, line:%d, %s", samplefilename, __LINE__, __FILE__);
   }
 
+  free(samplefilename);
+  samplefilename = NULL;
+  
   curl_easy_cleanup(classifyapp_data->curl_data);
 
   return retval;
