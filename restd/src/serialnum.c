@@ -104,7 +104,7 @@ int finish_checksum(char* checksum) {
     return 1;
 }
 
-static size_t flen(FILE* f)
+/* static size_t flen(FILE* f)
 {
     int curpos, len;
     curpos = ftell(f);
@@ -112,7 +112,7 @@ static size_t flen(FILE* f)
     len = ftell(f); 
     fseek(f, curpos, SEEK_SET);
     return len;
-}
+    } */
 
 int verify_init(int channel)
 {
@@ -466,9 +466,9 @@ static int verify_file_v0(char *filename, int channel)
     FILE *check_file = NULL;
     char full_checksum[MESSAGE_SIZE];    
     uint8_t signature_data[SIGNATURE_SIZE]; 
-    uint8_t *psignature_data;
-    int retval;
-    unsigned char *signature = NULL;
+    // uint8_t *psignature_data;
+    // int retval;
+    // unsigned char *signature = NULL;
     int verified = 0;
 #if defined(IGOLGI_PRIVATE_KEY)
     RSA *private_key = NULL;
@@ -568,7 +568,7 @@ int get_mac_address(const char *iface_name, unsigned char *mac_addr)
     int sock;
     int ret;
     int i;
-    int ok = 0;
+    // int ok = 0;
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1)

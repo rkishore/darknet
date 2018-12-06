@@ -282,7 +282,7 @@ static void handle_get_all_request(cJSON **resp_json, restful_comm_struct *restf
 static void handle_delete_request(int8_t *return_http_flag, restful_comm_struct *restful)
 {
   int cur_classify_status = -1;
-  classifyapp_struct *cur_classifyapp_data = restful->classifyapp_data;
+  // classifyapp_struct *cur_classifyapp_data = restful->classifyapp_data;
   struct timespec cur_timestamp;
   long running_time_sec = -1;
 
@@ -330,8 +330,8 @@ static int store_input_loc(cJSON **input_file_loc, classifyapp_struct *classifya
 {
 
   cJSON *input_data = *input_file_loc;
-  char *input_file_ext = NULL;
-  int retval = 0;
+  // char *input_file_ext = NULL;
+  // int retval = 0;
 
   if (input_data) {
 
@@ -361,7 +361,7 @@ static int store_input_type(cJSON **input_type, classifyapp_struct *classifyapp_
 {
 
   cJSON *input_type_data = *input_type;
-  char *input_file_ext = NULL;
+  // char *input_file_ext = NULL;
 
   if (input_type_data) {
 
@@ -407,8 +407,8 @@ static int store_input_type(cJSON **input_type, classifyapp_struct *classifyapp_
 static int store_output_file_loc(cJSON **output_file_dir, cJSON **output_file_prefix, classifyapp_struct *classifyapp_data, int8_t *response_http_code) 
 {
   cJSON *output_dir = *output_file_dir, *output_fileprefix = *output_file_prefix;
-  mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
-  int output_fd = -1;
+  // mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
+  // int output_fd = -1;
 
   if ( (output_dir) && (output_file_prefix) ) {
 
@@ -543,7 +543,7 @@ static int store_config_info(cJSON **config_info, classifyapp_struct *classifyap
 
 static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, restful_comm_struct *restful)
 {
-  char *out = NULL;
+  // char *out = NULL;
   cJSON *input_data = NULL, *output_dir = NULL, *config_data = NULL, *output_fileprefix = NULL, *input_type_data = NULL;
   classifyapp_struct *cur_classifyapp_data = restful->classifyapp_data;
   int cur_classify_thread_status = -1;
@@ -790,14 +790,14 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 {
 
   int cur_classify_status = -1;
-  float cur_perc_finished = -1.0;
+  // float cur_perc_finished = -1.0;
   cJSON *config_json = NULL;
-  char output_resolution[64];
-  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
+  // char output_resolution[64];
+  // classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
   struct tm *ptm;
   char start_time_string[MEDIUM_FIXED_STRING_SIZE], running_time_string[MEDIUM_FIXED_STRING_SIZE];
   struct timespec cur_timestamp;
-  long running_time_sec = -1, running_time_rem = -1, running_time_hr = -1, running_time_min = -1;
+  long running_time_sec = -1, running_time_rem = -1, running_time_hr = -1; //, running_time_min = -1;
 
   *response_json = cJSON_CreateObject();
 
@@ -894,8 +894,8 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 static void get_response_for_get_single(restful_comm_struct *restful, char **rendered_json)
 {
   cJSON *resp_json = NULL;
-  float cur_perc_finished = -1.0;
-  int cur_classify_status = -1;
+  // float cur_perc_finished = -1.0;
+  // int cur_classify_status = -1;
 
   // TODO: should not be doing this during the HTTP REQ-REP phase
   // Should instead get this info beforehand and report the last data read    
@@ -912,7 +912,7 @@ static void get_response_for_get_single(restful_comm_struct *restful, char **ren
 
 static void get_response_for_post(restful_comm_struct *restful, cJSON **parsedjson, char **rendered_json)
 {
-  float cur_perc_finished = -1.0;
+  // float cur_perc_finished = -1.0;
   struct tm *ptm;
   char start_time_string[MEDIUM_FIXED_STRING_SIZE];
 
@@ -945,9 +945,9 @@ static void send_response_to_client(int8_t *return_http_flag,
 
   char return_msg[1024];
   char *rendered = NULL;
-  float cur_perc_finished = -1.0;
-  int cur_classify_status = -1;
-  cJSON *last_classify_json = NULL, *cur_classify_json = NULL;
+  // float cur_perc_finished = -1.0;
+  // int cur_classify_status = -1;
+  // cJSON *last_classify_json = NULL, *cur_classify_json = NULL;
   classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data; 
 
   memset(return_msg, 0, sizeof(return_msg));		  
@@ -1091,9 +1091,9 @@ static void send_response_to_client(int8_t *return_http_flag,
 static void *restful_comm_thread_func(void *context)
 {   
   restful_comm_struct *restful = (restful_comm_struct*)context;
-  int child_socket = 0;
-  int ret; 
-  int i;
+  // int child_socket = 0;
+  // int ret; 
+  // int i;
   int servsock = 0;
   fd_set sockset;
   struct timeval select_timeout;                       
@@ -1130,7 +1130,7 @@ static void *restful_comm_thread_func(void *context)
 	uint32_t *data;             
 	int clientsock;
 	char cmd[128];
-	char content_type[128];
+	// char content_type[128];
 
 	clientsock = accept(servsock, (struct sockaddr *)&clientaddr, &clientsize);
 	syslog(LOG_INFO,"= Received tcp request on port %d from %s:%d\n", 

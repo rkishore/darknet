@@ -48,7 +48,7 @@ static int pull_specified_byte_range(classifyapp_struct *classifyapp_inst, char 
   CURLcode retval;
   char *byte_range_str = NULL;
   struct curl_slist *byte_range = NULL;
-  double bytes_pulled = -1.0;
+  // double bytes_pulled = -1.0;
 
   if (spec_byte_range != NULL)
     {
@@ -117,10 +117,10 @@ static size_t write_full_file(void *ptr, size_t size, size_t nmemb, void *userp)
 int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
 {
   
-  char *pat_pmt_range_str = NULL;
+  // char *pat_pmt_range_str = NULL;
   int retval = 0;
-  u64 end_byte_range = 0;
-  char *json_str = NULL;
+  // u64 end_byte_range = 0;
+  // char *json_str = NULL;
   char *samplefilename = NULL;
 
   if (asprintf(&samplefilename, "/tmp/%s", basename(get_config()->image_url)) < 0)
@@ -205,10 +205,10 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
 int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
 {
   
-  char *pat_pmt_range_str = NULL;
+  // char *pat_pmt_range_str = NULL;
   int retval = 0;
-  u64 end_byte_range = 0;
-  char *json_str = NULL;
+  // u64 end_byte_range = 0;
+  // char *json_str = NULL;
   char *samplefilename = NULL;
 
   if (asprintf(&samplefilename, "/tmp/%s", basename(get_config()->image_url)) < 0)
@@ -288,7 +288,7 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
 
 void *http_input_thread_func(void *arg)
 {
-  int retval = -1;
+  // int retval = -1;
   classifyapp_struct *classifyapp_data = (classifyapp_struct *)arg;
 
   if (config_curl_and_pull_file(classifyapp_data) < 0)

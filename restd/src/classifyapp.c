@@ -30,7 +30,8 @@
 // #include "detector.h"
 static restful_comm_struct *restful_struct = NULL;
 static void *restful_dispatch_queue = NULL;
-static int restful_done_handling_req = 0;
+
+extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
 
 classifyapp_struct classifyapp_inst;
 struct sigaction sa;
@@ -38,7 +39,7 @@ struct sigaction sa;
 void handle_signal(int signal)
 {
   const char *signal_name;
-  sigset_t pending;
+  // sigset_t pending;
 
   // Find out which signal we're handling
   switch (signal) {
@@ -72,7 +73,7 @@ void handle_signal(int signal)
 
 static int stop_classifyapp_config(classifyapp_struct *classifyapp_data)
 {
-  bool audio_thread_complete = false, speech_thread_complete = false;
+  // bool audio_thread_complete = false, speech_thread_complete = false;
 
   // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
 
@@ -119,7 +120,7 @@ static int stop_classifyapp_config(classifyapp_struct *classifyapp_data)
 
 static int start_classifyapp_config(restful_comm_struct *restful_data)
 {
-  int retval, sval1, sval2;
+  int retval; //, sval1, sval2;
   classifyapp_struct *classifyapp_data = restful_data->classifyapp_data;
   
   // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
@@ -179,7 +180,7 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
 static int check_input_url(restful_comm_struct *restful_ptr) 
 {
 
-  int retval, txtcheck = -1;
+  int txtcheck = -1;
   char *samplefilename = NULL, *filecmd = NULL;
   
   if (config_curl_and_pull_file_sample(restful_ptr->classifyapp_data) < 0)
@@ -326,11 +327,12 @@ static void *restful_classify_thread_func(void *context)
 {
   restful_comm_struct *restful = (restful_comm_struct *)context;
   classifyapp_struct *classifyapp_info = restful->classifyapp_data;
-  int done_handling_req = 0, cur_classify_status = -1;
-  bool all_done = false, proc_thread_done = false, audio_decoder_thread_done = false, continue_after_params_parsing = false;
-  char config_filename[LARGE_FIXED_STRING_SIZE];       
-  uint16_t wait_counter = 0;
-  bool input_thread_done = false;
+  int done_handling_req = 0;
+  // bool all_done = false, proc_thread_done = false, audio_decoder_thread_done = false, continue_after_params_parsing = false;
+  bool continue_after_params_parsing = false;
+  // char config_filename[LARGE_FIXED_STRING_SIZE];       
+  // uint16_t wait_counter = 0;
+  // bool input_thread_done = false;
 
   while(restful->is_classify_thread_active) {
     
@@ -399,7 +401,16 @@ static void *restful_classify_thread_func(void *context)
       clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
       continue;
     }    
-        
+
+    test_detector("/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
+		  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
+		  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
+		  "/tmp/dog.jpg",
+		  0.5,
+		  .5,
+		  "/tmp/predictions.png",
+		  0);
+    
     syslog(LOG_INFO, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
     clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
 
@@ -437,9 +448,6 @@ int restful_classify_thread_stop(restful_comm_struct *restful)
 
 int main(int argc, char **argv)
 {
-
-  bool all_done = false, proc_thread_done = false;
-  bool input_thread_done = false;
 
   fprintf(stdout, "Classify REST daemon (C) Copyright 2018-2019 igolgi Inc.\n");
   fprintf(stdout, "\nRELEASE: JAN 2019\n\n");
