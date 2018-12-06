@@ -33,10 +33,8 @@ OPTS=-O0 -g
 endif
 
 # List of flags to pass to the compilation command
-# CFLAGS=$(DEFINES) -I$(IDIR) -ggdb -Wall -O2 -D_REENTRANT -D_GNU_SOURCE -Wno-unused -fno-strict-aliasing -DBASE_THREADSAFE `pkg-config --cflags pocketsphinx sphinxbase libavfilter libavformat libavcodec libavutil libswscale libswresample libpostproc` #-DSELF_PULL 
 #CFLAGS=$(DEFINES) -I$(IDIR) -ggdb -Wall -O2 -D_REENTRANT -D_GNU_SOURCE -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -fno-strict-aliasing -DBASE_THREADSAFE 
-#CFLAGS=-I$(IDIR) -ggdb -Wall -O2 -D_REENTRANT -D_GNU_SOURCE -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -fno-strict-aliasing -DBASE_THREADSAFE
-CFLAGS=-I$(IDIR) -Wall -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC
+CFLAGS=-I$(IDIR) -ggdb -Wall -O2 -D_REENTRANT -D_GNU_SOURCE -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -DBASE_THREADSAFE
 
 ifeq ($(OPENMP), 1) 
 CFLAGS+= -fopenmp
