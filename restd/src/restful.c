@@ -1070,6 +1070,10 @@ static void send_response_to_client(int8_t *return_http_flag,
 	    "Date: Today\r\n"
 	    "Access-Control-Allow-Methods: GET, POST, DELETE\r\n",
 	    503, "Service unavailable");		  
+
+    cJSON_Delete(*parsed_json);		
+    *parsed_json = NULL;
+
     break;    
 
   default:

@@ -13,3 +13,4 @@
 
 void *http_input_thread_func(void *arg);
 int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data);
+int config_curl_and_pull_file(classifyapp_struct *classifyapp_data);
