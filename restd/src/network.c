@@ -728,6 +728,7 @@ void free_network(network *net)
     free(net->seen); 
     free(net->steps); 
     free(net->scales);
+    free(net->workspace);
     
 #ifdef GPU
     if(net->input_gpu) cuda_free(net->input_gpu);
