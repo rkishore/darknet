@@ -47,9 +47,10 @@ void print_usage(const char *app_name)
   fprintf(stderr, "\nparams (optional): \n");
   fprintf(stderr, "-b, --dnn-config-file | Filesystem location of the dnn config file | Default: %s\n", get_config()->dnn_config_file);
   fprintf(stderr, "-c, --dnn-weights-file | Filesystem location of the dnn weights file | Default: %s\n", get_config()->dnn_weights_file);
-  fprintf(stderr, "-d, --detection-thresh | Detection threshold below which objects detected are not reported | Default: %0.1f\n", get_config()->detection_thresh);
+  fprintf(stderr, "-d, --detection-thresh | Detection threshold below which objects detected are not reported | Default: %0.1f\n", get_config()->detection_threshold);
+  fprintf(stderr, "-e, --dnn-data-file | Filesystem location of the dnn data file | Default: %s\n", get_config()->dnn_data_file);
   fprintf(stderr, "-L, --log-level | Set the syslog LOG LEVEL | Default: LOG_INFO (%s) \n", get_config()->debug_level);
-  fprintf(stderr, "-e, --port [port number] | Port daemon is listening on for REST-ful API | Default = %d (if unspecified)\n", get_config()->daemon_port);
+  fprintf(stderr, "-f, --port [port number] | Port daemon is listening on for REST-ful API | Default = %d (if unspecified)\n", get_config()->daemon_port);
   
   fprintf(stderr, "\n");
 
@@ -127,13 +128,19 @@ void fill_default_config()
       exit(-1);
     }
 
+  memset(&config->dnn_data_file[0], 0, LARGE_FIXED_STRING_SIZE);
+  // strcpy(&config->dnn_config_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/cfg/yolov3-rwh.cfg");
+  strcpy(&config->dnn_data_file[0], (const char *)"/usr/local/share/classifyapp/cfg/coco.data");
+
   memset(&config->dnn_config_file[0], 0, LARGE_FIXED_STRING_SIZE);
-  strcpy(&config->dnn_config_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/cfg/yolov3-rwh.cfg");
+  // strcpy(&config->dnn_config_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/cfg/yolov3-rwh.cfg");
+  strcpy(&config->dnn_config_file[0], (const char *)"/usr/local/share/classifyapp/cfg/yolov3.cfg");
 
   memset(&config->dnn_weights_file[0], 0, LARGE_FIXED_STRING_SIZE);
-  strcpy(&config->dnn_weights_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/yolov3.weights");
+  //strcpy(&config->dnn_weights_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/yolov3.weights");
+  strcpy(&config->dnn_weights_file[0], (const char *)"/usr/local/share/classifyapp/cfg/yolov3.weights");
       
-  config->detection_thresh = 0.5;
+  config->detection_threshold = 0.5;
   config->daemon_port = 55555;
   
   return;

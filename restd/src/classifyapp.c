@@ -182,7 +182,7 @@ static int check_input_url(restful_comm_struct *restful_ptr)
       return -1;
     }    
 
-  if (asprintf(&samplefilename, "/tmp/%s", basename(get_config()->image_url)) < 0)
+  if (asprintf(&samplefilename, "%s/%s", restful_ptr->classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
     {
       syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
       return -1;
@@ -329,10 +329,10 @@ static void *restful_classify_thread_func(void *context)
   struct prep_network_info prep_netinfo_inst;
 
   prepare_detector_custom(&prep_netinfo_inst,
-			  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
-			  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
-			  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights");
-
+			  (char *)get_config()->dnn_data_file,
+			  (char *)get_config()->dnn_config_file,
+			  (char *)get_config()->dnn_weights_file);
+  
   while(restful->is_classify_thread_active) {
     
     pthread_mutex_lock(&restful->thread_status_lock);
@@ -405,7 +405,7 @@ static void *restful_classify_thread_func(void *context)
    
     run_detector_custom(&prep_netinfo_inst,
 			restful->classifyapp_data->appconfig.input_filename,
-			0.5,
+			restful->classifyapp_data->appconfig.detection_threshold,
 			.5,
 			"/tmp/predictions.png",
 			0);

@@ -12,9 +12,10 @@ struct Config
   
   char           unique_signature[HSIGNATURE_SIZE];
   char           hostname[HSIGNATURE_SIZE];
-  float          detection_thresh;
+  float          detection_threshold;
 
   char           interface_name[MEDIUM_FIXED_STRING_SIZE];
+  char           dnn_data_file[LARGE_FIXED_STRING_SIZE];
   char           dnn_config_file[LARGE_FIXED_STRING_SIZE];
   char           dnn_weights_file[LARGE_FIXED_STRING_SIZE];
 

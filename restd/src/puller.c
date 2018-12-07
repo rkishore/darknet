@@ -120,7 +120,9 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
   int retval = 0;
 
   memset(classifyapp_data->appconfig.input_filename, 0, LARGE_FIXED_STRING_SIZE);
-  snprintf(classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "/tmp/%s", basename(get_config()->image_url));
+  snprintf(classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "%s/%s",
+	   classifyapp_data->appconfig.output_directory,
+	   basename(get_config()->image_url));
 
   // Initialization
   classifyapp_data->bytes_pulled = 0;
@@ -201,7 +203,7 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
   // char *json_str = NULL;
   char *samplefilename = NULL;
 
-  if (asprintf(&samplefilename, "/tmp/%s", basename(get_config()->image_url)) < 0)
+  if (asprintf(&samplefilename, "%s/%s", classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
     {
       syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
       return -1;

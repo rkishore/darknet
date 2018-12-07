@@ -70,22 +70,11 @@ typedef struct _classifyapp_config_struct_ {
   //char acoustic_model[LARGE_FIXED_STRING_SIZE];
   //char dictionary[LARGE_FIXED_STRING_SIZE];
   //char language_model[LARGE_FIXED_STRING_SIZE];
-  //float writeout_duration;
+  float detection_threshold;
   //bool crash_recovery_flag;
   char input_filename[LARGE_FIXED_STRING_SIZE];
   
 } classifyapp_config_struct;
-
-/* 
-
-typedef struct FilteringContext {
-    AVFilterContext *buffersink_ctx;
-    AVFilterContext *buffersrc_ctx;
-    AVFilterGraph *filter_graph;
-} FilteringContext;
-
-*/
-
 
 typedef struct _classifyapp_struct_ {
 

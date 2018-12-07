@@ -623,6 +623,7 @@ int get_serial_number(char *serial_num, int channel)
     memset(callcommand, 0, sizeof(callcommand));
     sprintf(callcommand,"/usr/sbin/dmidecode --type 2 | grep -i serial > %s", tempfilename);
     retval = system(callcommand);
+    syslog(LOG_DEBUG, "= get_serial_info retval: %d, %s:%d", retval, __FILE__, __LINE__);
     tempfile = fopen(tempfilename,"r");
     if (!tempfile) {      
         unlink(tempfilename);

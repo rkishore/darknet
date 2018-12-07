@@ -444,91 +444,23 @@ static int store_output_file_loc(cJSON **output_file_dir, cJSON **output_file_pr
 static int store_config_info(cJSON **config_info, classifyapp_struct *classifyapp_data, int8_t *response_http_code) 
 {
   cJSON *config_data = *config_info;
-
+  cJSON *detection_threshold = NULL;
+  
   if (config_data) {
-    
-    /* acoustic_model = cJSON_GetObjectItem(config_data, "acoustic_model");
-    dictionary = cJSON_GetObjectItem(config_data, "dictionary");
-    language_model = cJSON_GetObjectItem(config_data, "language_model");
-    writeout_duration = cJSON_GetObjectItem(config_data, "writeout_duration");
-    */
-    
-    //int type;					/* The type of the item, as above. */
-    //	char *valuestring;			/* The item's string, if type==cJSON_String */
-    //	int valueint;				/* The item's number, if type==cJSON_Number */
-    //	double valuedouble;			/* The item's number, if type==cJSON_Number */
 
-    /* if ((acoustic_model) && (acoustic_model->valuestring)) {
+    detection_threshold = cJSON_GetObjectItem(config_data, "detection_threshold");
 
-      snprintf(classifyapp_data->appconfig.acoustic_model, LARGE_FIXED_STRING_SIZE-1, "%s", acoustic_model->valuestring);
-      syslog(LOG_DEBUG,"= acoustic_model: %s\n", classifyapp_data->appconfig.acoustic_model);
-
-    } else {
-
-      char *cur_err = NULL;
-      if (asprintf(&cur_err, "No acoustic model specified in incoming request or left unspecified") < 0)
-	syslog(LOG_ERR, "Out of memory? line:%d, %s", __LINE__, __FILE__);
-      else {
-	syslog(LOG_ERR, "= %s", cur_err);
-	free_mem(cur_err);
-      }
-      *response_http_code = HTTP_400;	
-      return -1;	  	
-	
-    }
-
-    if ((dictionary) && (dictionary->valuestring)) {
-
-      snprintf(classifyapp_data->appconfig.dictionary, LARGE_FIXED_STRING_SIZE-1, "%s", dictionary->valuestring);
-      syslog(LOG_DEBUG,"= dictionary: %s\n", classifyapp_data->appconfig.dictionary);
-
-    } else {
-
-      char *cur_err = NULL;
-      if (asprintf(&cur_err, "No dictionary specified in incoming request or left unspecified") < 0)
-	syslog(LOG_ERR, "Out of memory? line:%d, %s", __LINE__, __FILE__);
-      else {
-	syslog(LOG_ERR, "= %s", cur_err);
-	free_mem(cur_err);
-      }
-      *response_http_code = HTTP_400;	
-      return -1;	  	
-	
-    }
-	    
-
-    if ((language_model) && (language_model->valuestring)) {
+    if ( (detection_threshold) && (detection_threshold->valuedouble) ) {
       
-      snprintf(classifyapp_data->appconfig.language_model, LARGE_FIXED_STRING_SIZE-1, "%s", language_model->valuestring);
-      syslog(LOG_DEBUG,"= language_model: %s\n", classifyapp_data->appconfig.language_model);
+      classifyapp_data->appconfig.detection_threshold = detection_threshold->valuedouble;
+      syslog(LOG_DEBUG,"= detection_threshold: %0.1f\n", classifyapp_data->appconfig.detection_threshold);
 
     } else {
 
-      char *cur_err = NULL;
-      if (asprintf(&cur_err, "No language model specified in incoming request or left unspecified") < 0)
-	syslog(LOG_ERR, "Out of memory? line:%d, %s", __LINE__, __FILE__);
-      else {
-	syslog(LOG_ERR, "= %s", cur_err);
-	free_mem(cur_err);
-      }
-      *response_http_code = HTTP_400;	
-      return -1;	  	
-	
-    }
-
-    if ( (writeout_duration) && (writeout_duration->valuedouble) ) {
-      
-      classifyapp_data->appconfig.writeout_duration = writeout_duration->valuedouble;
-      syslog(LOG_DEBUG,"= writeout_duration: %0.1f\n", classifyapp_data->appconfig.writeout_duration);
-
-    } else {
-
-      classifyapp_data->appconfig.writeout_duration = get_config()->writeout_duration;
-      syslog(LOG_DEBUG,"= writeout_duration: %0.1f\n", classifyapp_data->appconfig.writeout_duration);
+      classifyapp_data->appconfig.detection_threshold = get_config()->detection_threshold;
+      syslog(LOG_DEBUG,"= detection_threshold: %0.1f\n", classifyapp_data->appconfig.detection_threshold);
 
     }
-    
-    */
 
   } else {
 
@@ -566,11 +498,10 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     input_type_data = cJSON_GetObjectItem(*parsedjson, "type");
     output_dir = cJSON_GetObjectItem(*parsedjson, "output_dir");
     output_fileprefix = cJSON_GetObjectItem(*parsedjson, "output_fileprefix");
-    // config_data = cJSON_GetObjectItem(*parsedjson, "config");
+    config_data = cJSON_GetObjectItem(*parsedjson, "config");
 
     if ( (input_data == NULL) || (input_type_data == NULL) ||
-	 (output_dir == NULL) || (output_fileprefix == NULL) ) {
-	 // || (config_data == NULL) ) {
+	 (output_dir == NULL) || (output_fileprefix == NULL) || (config_data == NULL) ) {
       *return_http_flag = HTTP_400;
       return -1;
     }
@@ -584,8 +515,8 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     if (store_output_file_loc(&output_dir, &output_fileprefix, cur_classifyapp_data, return_http_flag) < 0) 
       return -1;
 
-    //if (store_config_info(&config_data, cur_classifyapp_data, return_http_flag) < 0) 
-    //return -1;    
+    if (store_config_info(&config_data, cur_classifyapp_data, return_http_flag) < 0) 
+      return -1;    
 
     *return_http_flag = HTTP_201;
     

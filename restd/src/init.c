@@ -66,6 +66,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
       {"dnn-config-file", required_argument, 0, 'b'},
       {"dnn-weights-file", required_argument, 0, 'c'},
       {"detection-thresh", required_argument, 0, 'd'},
+      {"dnn-data-file", required_argument, 0, 'e'},
       {"log-level", required_argument, 0, 'L'},
       {"help", no_argument, 0, 'h' },
       {"version", no_argument, 0, 'v' },
@@ -73,7 +74,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
     };
 
     int option_index = 0;
-    int c = getopt_long(*argc, argv, "a:b::L:hv", 
+    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:L:hv", 
 			long_options,
                         &option_index);
     int sizeof_char_ptr = sizeof(char *);
@@ -97,7 +98,14 @@ get_info_from_cmdline_args(int *argc, char **argv)
       memcpy(mod_config()->dnn_weights_file, optarg, strlen(optarg));      
       break;
     case 'd':
-      mod_config()->detection_thresh = atof(optarg);
+      mod_config()->detection_threshold = atof(optarg);
+      break;
+    case 'e':
+      memset(mod_config()->dnn_data_file, 0, LARGE_FIXED_STRING_SIZE);
+      memcpy(mod_config()->dnn_data_file, optarg, strlen(optarg));      
+      break;
+    case 'f':
+      mod_config()->daemon_port = atoi(optarg);
       break;
     case 'L' : 
       //      mod_config()->debug_level = optarg;
@@ -121,10 +129,11 @@ get_info_from_cmdline_args(int *argc, char **argv)
       exit(EXIT_FAILURE);
     }
 
-  fprintf(stderr, "= CMDLINE args | dnn_config_file: %s | dnn_weights_file: %s | detection_thresh: %0.1f | iface_name: %s\n",
+  fprintf(stderr, "= CMDLINE args | dnn_data_file: %s | dnn_config_file: %s | dnn_weights_file: %s | detection_thresh: %0.1f | iface_name: %s\n",
+	  get_config()->dnn_data_file,
 	  get_config()->dnn_config_file,
 	  get_config()->dnn_weights_file,
-	  get_config()->detection_thresh,
+	  get_config()->detection_threshold,
 	  get_config()->interface_name);
   
   return;
