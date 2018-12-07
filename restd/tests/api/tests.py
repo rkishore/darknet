@@ -23,16 +23,25 @@ parser.add_argument('--testdelete', help="Use this to test HTTP DELETE. Provide 
 #parser.add_argument('--testerror', help="Set this to 1 to test response to erroneous JSON inputs (default=0)", default=0, type=int)
 
 values_json_dict = { 
-    "vehicle1": {
-        "input": "http://li1249-5.members.linode.com:8080/output/Car1.png",
+    "sample1": {
+        "input": "http://li1249-5.members.linode.com:8080/output/dog.jpg",
         "type": "stream",
         "output_dir": "/tmp",
         "output_fileprefix": "TEST1",
         "config": {
-            "acoustic_model": "/usr/local/share/pocketsphinx/acoustic/en-us",
-            "language_model": "/usr/local/share/pocketsphinx/language/en-us.lm.dmp",
-            "dictionary": "/usr/local/share/pocketsphinx/dictionary/cmu07a.dic",
-            "writeout_duration": 120.0,
+            # "data_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
+            # "network_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
+            # "weights_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
+            "detection_threshold": 0.5,
+        },
+    },
+    "sample2": {
+        "input": "http://li1249-5.members.linode.com:8080/output/Car1.jpg",
+        "type": "stream",
+        "output_dir": "/tmp",
+        "output_fileprefix": "TEST1",
+        "config": {
+            "detection_threshold": 0.5,
         },
     },
 }
