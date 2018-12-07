@@ -327,7 +327,12 @@ static void *restful_classify_thread_func(void *context)
   // uint16_t wait_counter = 0;
   // bool input_thread_done = false;
   struct prep_network_info prep_netinfo_inst;
-  
+
+  prepare_detector_custom(&prep_netinfo_inst,
+			  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
+			  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
+			  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights");
+
   while(restful->is_classify_thread_active) {
     
     pthread_mutex_lock(&restful->thread_status_lock);
@@ -396,17 +401,16 @@ static void *restful_classify_thread_func(void *context)
       continue;
     }    
 
-    prepare_detector_custom(&prep_netinfo_inst,
-			    "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
-			    "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
-			    "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights");
+    syslog(LOG_INFO, "= About to run the detect+classify, %s:%d", __FILE__, __LINE__);
+   
     run_detector_custom(&prep_netinfo_inst,
 			restful->classifyapp_data->appconfig.input_filename,
 			0.5,
 			.5,
 			"/tmp/predictions.png",
 			0);
-    free_detector_internal_datastructures(&prep_netinfo_inst);
+
+    syslog(LOG_INFO, "= Done with detect+classify, %s:%d", __FILE__, __LINE__);
     
     /* 
     test_detector("/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
@@ -425,7 +429,8 @@ static void *restful_classify_thread_func(void *context)
     sleep(3);
     
   }
-  
+
+  free_detector_internal_datastructures(&prep_netinfo_inst);
   syslog(LOG_INFO, "= Leaving restful_classify_thread, line:%d, %s", __LINE__, __FILE__);
 
   return NULL;
