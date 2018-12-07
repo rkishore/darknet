@@ -3,9 +3,10 @@
 #
 include config.mak
 
-GPU=0
+# set GPU=1 and CUDNN=1 to speedup on GPU
+GPU=1
 CUDNN=0
-OPENCV=1
+OPENCV=0
 OPENMP=1
 DEBUG=0
 
@@ -17,6 +18,36 @@ ARCH= -gencode arch=compute_30,code=sm_30 \
 
 # This is what I use, uncomment if you know your arch and want to specify
 # ARCH= -gencode arch=compute_52,code=compute_52
+
+# Tesla V100
+# ARCH= -gencode arch=compute_70,code=[sm_70,compute_70]
+
+# GeForce RTX 2080 Ti, RTX 2080, RTX 2070	Quadro RTX 8000, Quadro RTX 6000, Quadro RTX 5000	Tesla T4
+# ARCH= -gencode arch=compute_75,code=[sm_75,compute_75]
+
+# Jetson XAVIER
+# ARCH= -gencode arch=compute_72,code=[sm_72,compute_72]
+
+# GTX 1080, GTX 1070, GTX 1060, GTX 1050, GTX 1030, Titan Xp, Tesla P40, Tesla P4
+# ARCH= -gencode arch=compute_61,code=sm_61 -gencode arch=compute_61,code=compute_61
+
+# GP100/Tesla P100  DGX-1
+# ARCH= -gencode arch=compute_60,code=sm_60
+
+# For Jetson TX1, Tegra X1, DRIVE CX, DRIVE PX - uncomment:
+# ARCH= -gencode arch=compute_53,code=[sm_53,compute_53]
+
+# For Jetson Tx2 or Drive-PX2 uncomment:
+# ARCH= -gencode arch=compute_62,code=[sm_62,compute_62]
+
+SLIB=libdarknet.so
+ALIB=libdarknet.a
+
+AR=ar
+ARFLAGS=rcs
+EXEC=$(ODIR)/classifyapp
+
+OS := $(shell uname)
 
 ifeq ($(MAX_CLASSIFY_CHILDREN),)
     DEFINES += \
@@ -34,14 +65,37 @@ endif
 
 # List of flags to pass to the compilation command
 #CFLAGS=$(DEFINES) -I$(IDIR) -ggdb -Wall -O2 -D_REENTRANT -D_GNU_SOURCE -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -fno-strict-aliasing -DBASE_THREADSAFE 
-CFLAGS=-I$(IDIR) -ggdb -Wall -O2 -D_REENTRANT -D_GNU_SOURCE -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -DBASE_THREADSAFE
+#CFLAGS=-I$(IDIR) -ggdb -Wall -O2 -D_REENTRANT -D_GNU_SOURCE -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -DBASE_THREADSAFE
+CFLAGS=-I$(IDIR) -Wall -O0 -D_REENTRANT -D_GNU_SOURCE -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -DBASE_THREADSAFE
+NVCC_CFLAGS=-Wall -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -fopenmp -Ofast -DGPU -DCUDNN
+
+#LIBS=-lpthread -L/usr/local/lib -Wl,-Bsymbolic-functions -Wl,-z,relro `pkg-config --libs pocketsphinx sphinxbase openssl zlib libavfilter libavformat libavcodec libavutil libswscale libswresample libpostproc` 
+LIBS=-lpthread -L/usr/local/lib -lcurl -Wl,-Bsymbolic-functions -Wl,-z,relro -lcrypto -lm
 
 ifeq ($(OPENMP), 1) 
 CFLAGS+= -fopenmp
 endif
 
-#LIBS=-lpthread -L/usr/local/lib -Wl,-Bsymbolic-functions -Wl,-z,relro `pkg-config --libs pocketsphinx sphinxbase openssl zlib libavfilter libavformat libavcodec libavutil libswscale libswresample libpostproc` 
-LIBS=-lpthread -L/usr/local/lib -lcurl -Wl,-Bsymbolic-functions -Wl,-z,relro -lcrypto -lm
+ifeq ($(GPU), 1)
+COMMON+= -DGPU -I/usr/local/cuda/include/
+CFLAGS+= -DGPU -I/usr/local/cuda/include/
+ifeq ($(OS),Darwin) #MAC
+LIBS+= -L/usr/local/cuda/lib -lcuda -lcudart -lcublas -lcurand
+else
+LIBS+= -L/usr/local/cuda/lib64 -lcuda -lcudart -lcublas -lcurand
+endif
+endif
+
+ifeq ($(CUDNN), 1)
+COMMON+= -DCUDNN
+ifeq ($(OS),Darwin) #MAC
+CFLAGS+= -DCUDNN -I/usr/local/cuda/include
+LIBS+= -L/usr/local/cuda/lib -lcudnn
+else
+CFLAGS+= -DCUDNN -I/usr/local/cudnn/include
+LIBS+= -L/usr/local/cudnn/lib64 -lcudnn
+endif
+endif
 
 ifeq ($(OPENCV), 1) 
 COMMON+= -DOPENCV
@@ -59,7 +113,14 @@ DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 #_OBJS = fastpool.o threadqueue.o config.o serialnum.o init.o dfxp.o allocator.o pool.o comm.o udpcomm.o cjson.o restful.o classifyapp.o
 #_OBJS = fastpool.o threadqueue.o config.o serialnum.o init.o allocator.o pool.o comm.o udpcomm.o cjson.o puller.o restful.o classifyapp.o
 _OBJS=gemm.o utils.o cuda.o deconvolutional_layer.o convolutional_layer.o list.o image.o activations.o im2col.o col2im.o blas.o crop_layer.o dropout_layer.o maxpool_layer.o softmax_layer.o data.o matrix.o network.o connected_layer.o cost_layer.o parser.o option_list.o detection_layer.o route_layer.o upsample_layer.o box.o normalization_layer.o avgpool_layer.o layer.o local_layer.o shortcut_layer.o logistic_layer.o activation_layer.o rnn_layer.o gru_layer.o crnn_layer.o demo.o batchnorm_layer.o region_layer.o reorg_layer.o tree.o  lstm_layer.o l2norm_layer.o yolo_layer.o iseg_layer.o image_opencv.o detector.o common.o fastpool.o threadqueue.o config.o serialnum.o init.o cjson.o puller.o restful.o classifyapp.o
+ifeq ($(GPU), 1) 
+LIBS += -lstdc++
+_OBJS += convolutional_kernels.o deconvolutional_kernels.o activation_kernels.o im2col_kernels.o col2im_kernels.o blas_kernels.o crop_layer_kernels.o dropout_layer_kernels.o maxpool_layer_kernels.o avgpool_layer_kernels.o
+endif
+
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
+
+all: bin $(SLIB) $(ALIB) $(EXEC)
 
 $(ODIR)/%.o: $(SRC)/%.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -67,8 +128,20 @@ $(ODIR)/%.o: $(SRC)/%.c $(DEPS)
 $(ODIR)/%.o: $(SRC)/%.cpp $(DEPS)
 	$(CPP) -c -o $@ $< $(CFLAGS)
 
-$(ODIR)/classifyapp: $(OBJS)
-	$(CC) -rdynamic -o $@ $^ $(CFLAGS) $(LIBS)
+$(ODIR)/%.o: $(SRC)/%.cu $(DEPS)
+	$(NVCC) $(ARCH) $(COMMON) --compiler-options "$(CFLAGS)" -c $< -o $@
+
+$(ALIB): $(OBJS)
+	$(AR) $(ARFLAGS) $@ $^
+
+$(SLIB): $(OBJS)
+	$(CC) $(CFLAGS) -shared $^ -o $@ $(LIBS)
+
+$(EXEC): $(OBJS) $(ALIB)
+	$(CC) $(COMMON) $(CFLAGS) -o $@ $^ $(LIBS) $(ALIB)
+
+bin:
+	mkdir -p bin
 
 .PHONY: clean
 
