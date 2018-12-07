@@ -1112,6 +1112,7 @@ static void *restful_comm_thread_func(void *context)
       }
     }
   }
+  syslog(LOG_INFO, "= About to leave restful_thread, line:%d, %s", __LINE__, __FILE__);
   close(servsock);
   syslog(LOG_INFO, "= Leaving restful_thread, line:%d, %s", __LINE__, __FILE__);
   return NULL;

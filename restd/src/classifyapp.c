@@ -54,7 +54,8 @@ void handle_signal(int signal)
     signal_name = "SIGUSR1";
     break;
   case SIGINT:
-    //printf("Caught SIGINT, exiting now\n");
+    signal_name = "SIGINT";
+    syslog(LOG_INFO, "= Caught SIGINT, restful_struct: %p", restful_struct);
     break;
     //exit(0);
   default:
@@ -70,7 +71,7 @@ void handle_signal(int signal)
     }
 
   if (signal_name != NULL)
-    syslog(LOG_DEBUG, "= Done handling %s - wait for app to quit", signal_name);
+    syslog(LOG_INFO, "= Done handling %s - wait for app to quit", signal_name);
   return;
   
 }
@@ -347,8 +348,11 @@ static void *restful_classify_thread_func(void *context)
       if (!dispatch_msg) {
 	  
 	if (!restful->is_classify_thread_active)
-	  break;
-
+	  {
+	    syslog(LOG_INFO, "= About to leave restful_classify_thread, line:%d, %s", __LINE__, __FILE__);
+	    break;
+	  }
+	
 	usleep(10000);
 	continue;
 
@@ -430,6 +434,7 @@ static void *restful_classify_thread_func(void *context)
     
   }
 
+  syslog(LOG_INFO, "= About to leave restful_classify_thread, line:%d, %s", __LINE__, __FILE__);
   free_detector_internal_datastructures(&prep_netinfo_inst);
   syslog(LOG_INFO, "= Leaving restful_classify_thread, line:%d, %s", __LINE__, __FILE__);
 
@@ -514,7 +519,7 @@ int main(int argc, char **argv)
     exit(-1);
   }
   */
-  
+
   pthread_join(restful_struct->classify_thread_id, NULL);
   pthread_join(restful_struct->restful_server_thread_id, NULL);
   message_queue_destroy(restful_struct->dispatch_queue);

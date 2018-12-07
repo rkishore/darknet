@@ -5,7 +5,7 @@ include config.mak
 
 # set GPU=1 and CUDNN=1 to speedup on GPU
 GPU=1
-CUDNN=0
+CUDNN=1
 OPENCV=0
 OPENMP=1
 DEBUG=0
