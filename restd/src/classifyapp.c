@@ -23,6 +23,7 @@
 #include "comm.h"
 #include "restful.h"
 #include "common.h"
+#include "darknet.h"
 
 #define APP_VERSION_MAJOR    1
 #define APP_VERSION_MINOR    0
@@ -32,6 +33,9 @@ static restful_comm_struct *restful_struct = NULL;
 static void *restful_dispatch_queue = NULL;
 
 extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
+extern void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datacfg, char *cfgfile, char *weightfile);
+extern void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
+extern void free_detector_internal_datastructures(struct prep_network_info *prep_netinfo);
 
 classifyapp_struct classifyapp_inst;
 struct sigaction sa;
@@ -322,7 +326,8 @@ static void *restful_classify_thread_func(void *context)
   // char config_filename[LARGE_FIXED_STRING_SIZE];       
   // uint16_t wait_counter = 0;
   // bool input_thread_done = false;
-
+  struct prep_network_info prep_netinfo_inst;
+  
   while(restful->is_classify_thread_active) {
     
     pthread_mutex_lock(&restful->thread_status_lock);
@@ -391,6 +396,19 @@ static void *restful_classify_thread_func(void *context)
       continue;
     }    
 
+    prepare_detector_custom(&prep_netinfo_inst,
+			    "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
+			    "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
+			    "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights");
+    run_detector_custom(&prep_netinfo_inst,
+			restful->classifyapp_data->appconfig.input_filename,
+			0.5,
+			.5,
+			"/tmp/predictions.png",
+			0);
+    free_detector_internal_datastructures(&prep_netinfo_inst);
+    
+    /* 
     test_detector("/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
 		  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
 		  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
@@ -399,6 +417,7 @@ static void *restful_classify_thread_func(void *context)
 		  .5,
 		  "/tmp/predictions.png",
 		  0);
+    */
     
     syslog(LOG_INFO, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
     clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);

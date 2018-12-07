@@ -601,6 +601,16 @@ typedef struct list{
     node *back;
 } list;
 
+struct prep_network_info {
+  list *options;
+  char *name_list;
+  int names_array_len;
+  char **names;
+  
+  image **alphabet;
+  network *net;
+};
+  
 pthread_t load_data(load_args args);
 list *read_data_cfg(char *filename);
 list *read_cfg(char *filename);
