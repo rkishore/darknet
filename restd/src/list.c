@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "list.h"
+#include "option_list.h"
 
 list *make_list()
 {
@@ -70,10 +71,15 @@ void free_list(list *l)
 	free(l);
 }
 
-void free_list_contents(list *l)
+void free_list_contents(list *l, bool end_flag)
 {
 	node *n = l->front;
 	while(n){
+	  if (end_flag == true)
+	    {
+	      kvp *p = (kvp *)n->val;
+	      free(p->key);
+	    }
 		free(n->val);
 		n = n->next;
 	}

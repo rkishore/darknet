@@ -658,7 +658,7 @@ int get_num_labels(char *filename)
 {
   list *plist = get_paths(filename);
   int count = get_list_len(plist);
-  free_list_contents(plist);
+  free_list_contents(plist, false);
   free_list(plist);
   return count;
 }

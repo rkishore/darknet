@@ -623,7 +623,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         free_image(sized);
         if (filename) break;
     }
-    free_list_contents(options);
+    free_list_contents(options, true);
     free_list(options);
     for(j = 0; j < nsize; ++j)
       {
