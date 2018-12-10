@@ -5,6 +5,21 @@
 
 #define START_CLASSIFY_ID 0
 
+#define MAX_DETECTIONS_PER_IMAGE 16
+#define MAX_LABEL_STRING_SIZE 128
+
+struct detection_results {
+
+  int num_labels_detected;
+  
+  char labels[MAX_DETECTIONS_PER_IMAGE][MAX_LABEL_STRING_SIZE];
+
+  float confidence[MAX_DETECTIONS_PER_IMAGE];
+
+  float processing_time_in_seconds;
+  
+};
+
 typedef struct _classify_job_info_ {
 
   int                classify_id;
@@ -17,6 +32,8 @@ typedef struct _classify_job_info_ {
 
   struct timespec    start_timestamp, end_timestamp;
 
+  struct detection_results results_info;
+  
 } classify_job_info;
 
 typedef struct _restful_comm_struct_ {

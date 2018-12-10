@@ -34,7 +34,7 @@ static void *restful_dispatch_queue = NULL;
 
 extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
 extern void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datacfg, char *cfgfile, char *weightfile);
-extern void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
+extern void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen, struct detection_results *results_info);
 extern void free_detector_internal_datastructures(struct prep_network_info *prep_netinfo);
 
 classifyapp_struct classifyapp_inst;
@@ -321,7 +321,7 @@ static void *restful_classify_thread_func(void *context)
 {
   restful_comm_struct *restful = (restful_comm_struct *)context;
   classifyapp_struct *classifyapp_info = restful->classifyapp_data;
-  int done_handling_req = 0;
+  int done_handling_req = 0, i = 0;
   // bool all_done = false, proc_thread_done = false, audio_decoder_thread_done = false, continue_after_params_parsing = false;
   bool continue_after_params_parsing = false;
   // char config_filename[LARGE_FIXED_STRING_SIZE];       
@@ -329,6 +329,7 @@ static void *restful_classify_thread_func(void *context)
   // bool input_thread_done = false;
   struct prep_network_info prep_netinfo_inst;
 
+  memset(&restful->cur_classify_info.results_info, 0, sizeof(struct detection_results));
   prepare_detector_custom(&prep_netinfo_inst,
 			  (char *)get_config()->dnn_data_file,
 			  (char *)get_config()->dnn_config_file,
@@ -391,7 +392,7 @@ static void *restful_classify_thread_func(void *context)
     if (!restful->is_classify_thread_active)
       break;
   
-    syslog(LOG_INFO, "= Continue? %d | %d, %s", continue_after_params_parsing, __LINE__, __FILE__);
+    syslog(LOG_DEBUG, "= Continue? %d | %d, %s", continue_after_params_parsing, __LINE__, __FILE__);
     if (continue_after_params_parsing == false)
       continue;      
 
@@ -420,7 +421,8 @@ static void *restful_classify_thread_func(void *context)
 			restful->classifyapp_data->appconfig.detection_threshold,
 			.5,
 			"/tmp/predictions.png",
-			0);
+			0,
+			&restful->cur_classify_info.results_info);
 
     syslog(LOG_INFO, "= Done with detect+classify, %s:%d", __FILE__, __LINE__);
     
@@ -435,17 +437,24 @@ static void *restful_classify_thread_func(void *context)
 		  0);
     */
     
-    syslog(LOG_INFO, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
+    syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
     clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
+    pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
+    restful->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
+    pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
 
-    sleep(3);
+    syslog(LOG_INFO, "= Num. labels detected: %d in time: %0.2f milliseconds",
+	   restful->cur_classify_info.results_info.num_labels_detected,
+	   restful->cur_classify_info.results_info.processing_time_in_seconds * 1000.0);
+    for (i = 0; i<restful->cur_classify_info.results_info.num_labels_detected; i++)
+      syslog(LOG_INFO, "= Label #: %d | name: %s | confidence: %0.2f%%", i, restful->cur_classify_info.results_info.labels[i], restful->cur_classify_info.results_info.confidence[i]);
     
   }
 
   syslog(LOG_INFO, "= About to leave restful_classify_thread, line:%d, %s", __LINE__, __FILE__);
   free_detector_internal_datastructures(&prep_netinfo_inst);
   syslog(LOG_INFO, "= Leaving restful_classify_thread, line:%d, %s", __LINE__, __FILE__);
-
+  
   return NULL;
 }
 

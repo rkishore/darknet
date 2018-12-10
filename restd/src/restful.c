@@ -12,7 +12,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <fcntl.h>
-#include "cjson.h"
+#include "cJSON.h"
 #include "restful.h"
 #include "threadqueue.h"
 #include "fastpool.h"
@@ -726,9 +726,8 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 						  cJSON **response_json)
 {
 
-  int cur_classify_status = -1;
-  // float cur_perc_finished = -1.0;
-  cJSON *config_json = NULL;
+  int cur_classify_status = -1, i = 0;
+  cJSON *config_json = NULL, *results_json = NULL, *labels_array_json = NULL, *confidence_array_json = NULL;
   // char output_resolution[64];
   // classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
   struct tm *ptm;
@@ -754,16 +753,28 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
     cJSON_AddStringToObject(*response_json, "input", get_config()->image_url);
     cJSON_AddStringToObject(*response_json, "output_dir", get_config()->output_directory);
     cJSON_AddStringToObject(*response_json, "output_fileprefix", get_config()->output_fileprefix);
-
     cJSON_AddItemToObject(*response_json, "config", config_json=cJSON_CreateObject());
- 
-    //cJSON_AddNumberToObject(*response_json, "percentage_finished", cur_perc_finished);
+    cJSON_AddNumberToObject(config_json, "detection_threshold", restful_ptr->classifyapp_data->appconfig.detection_threshold);
 
     if (cur_classify_status == CLASSIFY_STATUS_COMPLETED) {
 
       cJSON_AddStringToObject(*response_json, "status", "finished");
       cJSON_AddNullToObject(*response_json, "error_msg");
-    
+
+      cJSON_AddItemToObject(*response_json, "results", results_json=cJSON_CreateObject());
+      cJSON_AddNumberToObject(results_json, "num_labels_detected", restful_ptr->cur_classify_info.results_info.num_labels_detected);
+
+      labels_array_json = cJSON_CreateArray();
+      for ( i=0; i<restful_ptr->cur_classify_info.results_info.num_labels_detected; i++)
+	{
+	  cJSON_AddItemToArray(labels_array_json, cJSON_CreateString((const char *)restful_ptr->cur_classify_info.results_info.labels[i]));
+	}
+      cJSON_AddItemToObject(results_json, "labels", labels_array_json);
+
+      confidence_array_json = cJSON_CreateFloatArray((const float *)restful_ptr->cur_classify_info.results_info.confidence, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+      cJSON_AddItemToObject(results_json, "confidence", confidence_array_json);
+      cJSON_AddNumberToObject(results_json, "processing_time_in_ms", restful_ptr->cur_classify_info.results_info.processing_time_in_seconds*1000.0);
+      
       running_time_sec = (long)difftime(restful_ptr->cur_classify_info.end_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
       running_time_hr = running_time_sec / SECONDS_IN_HOUR;
       running_time_rem = running_time_sec % SECONDS_IN_HOUR;

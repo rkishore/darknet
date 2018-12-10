@@ -1,6 +1,7 @@
 #include "darknet.h"
 #include "list.h"
 #include "data.h"
+#include "restful.h"
 
 static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90};
 
@@ -652,7 +653,32 @@ void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datac
   return;
 }
 
-void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen)
+void get_detections_custom(detection *dets, int num, float thresh, char **names, int classes, struct detection_results *results_info)
+{
+
+  int i,j, k = 0;
+
+  for(i = 0; i < num; ++i){
+    for(j = 0; j < classes; ++j){
+      if (dets[i].prob[j] > thresh){
+
+	// printf("%s: %.0f%%\n", names[j], dets[i].prob[j]*100);
+
+	snprintf(&results_info->labels[k][0], MAX_LABEL_STRING_SIZE-1, "%s", names[j]);
+	results_info->confidence[k] = dets[i].prob[j]*100;
+	k += 1;
+	
+      }
+    }
+  }
+
+  results_info->num_labels_detected = k;
+  
+  return;
+  
+}
+
+void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen, struct detection_results *results_info)
 {
 
     char **names = prep_netinfo->names;
@@ -684,14 +710,17 @@ void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename,
         float *X = sized.data;
         time=what_time_is_it_now();
         network_predict(net, X);
-        printf("%s: Predicted in %f seconds.\n", input, what_time_is_it_now()-time);
+	results_info->processing_time_in_seconds = what_time_is_it_now()-time;
+        // printf("= %s: Predicted in %f seconds.\n", input, results_info->processing_time_in_seconds);
         int nboxes = 0;
         detection *dets = get_network_boxes(net, im.w, im.h, thresh, hier_thresh, 0, 1, &nboxes);
         //printf("%d\n", nboxes);
         //if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
+	get_detections_custom(dets, nboxes, thresh, names, l.classes, results_info);
         draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
         free_detections(dets, nboxes);
+	
         if(outfile){
             save_image(im, outfile);
         }
@@ -702,7 +731,7 @@ void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename,
             show_image(im, "predictions", 0);
 #endif
         }
-
+		
         free_image(im);
         free_image(sized);
         if (filename) break;
