@@ -723,13 +723,17 @@ void free_network(network *net)
     if(net->input) free(net->input);
     if(net->truth) free(net->truth);
     // to fix memory leak
-    free(net->t); 
-    free(net->cost); 
-    free(net->seen); 
-    free(net->steps); 
-    free(net->scales);
+    if (net->t) free(net->t);
+    if (net->cost) free(net->cost);
+    if (net->seen) free(net->seen);
+    if (net->steps) free(net->steps);
+    if (net->scales) free(net->scales);
+#ifdef GPU
+    cuda_free(net->workspace);
+#else
     free(net->workspace);
-    
+#endif
+ 
 #ifdef GPU
     if(net->input_gpu) cuda_free(net->input_gpu);
     if(net->truth_gpu) cuda_free(net->truth_gpu);

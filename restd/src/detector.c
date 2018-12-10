@@ -635,11 +635,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     for (i = 0; i < names_array_len; i++)
       free(names[i]);
     free(names);
-#ifdef GPU
-    fprintf(stderr, "= Need to fix code to free_network when GPU support is enabled, %s:%d", __FILE__, __LINE__);
-#else
     free_network(net);
-#endif
 }
 
 void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datacfg, char *cfgfile, char *weightfile)
@@ -733,11 +729,7 @@ void free_detector_internal_datastructures(struct prep_network_info *prep_netinf
   for (i = 0; i < prep_netinfo->names_array_len; i++)
     free(prep_netinfo->names[i]);
   free(prep_netinfo->names);
-#ifdef GPU
-  fprintf(stderr, "= Need to fix code to free_network when GPU support is enabled to exit gracefully without memory leaks, %s:%d\n", __FILE__, __LINE__);
-#else
   free_network(prep_netinfo->net);
-#endif
   
   return;
 }
