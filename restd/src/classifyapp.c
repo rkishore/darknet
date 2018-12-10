@@ -394,16 +394,24 @@ static void *restful_classify_thread_func(void *context)
     syslog(LOG_INFO, "= Continue? %d | %d, %s", continue_after_params_parsing, __LINE__, __FILE__);
     if (continue_after_params_parsing == false)
       continue;      
-    
-    if (config_curl_and_pull_file(classifyapp_info) < 0)
-    {
-      syslog(LOG_ERR, "= Could not config. curl and pull file, %s:%d", __FILE__, __LINE__);
-      pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
-      restful->cur_classify_info.classify_status = CLASSIFY_STATUS_ERROR;
-      pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
-      clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
-      continue;
-    }    
+
+    if (!strcmp(restful->classifyapp_data->appconfig.input_type, "stream"))
+      {
+	if (config_curl_and_pull_file(classifyapp_info) < 0)
+	  {
+	    syslog(LOG_ERR, "= Could not config. curl and pull file, %s:%d", __FILE__, __LINE__);
+	    pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
+	    restful->cur_classify_info.classify_status = CLASSIFY_STATUS_ERROR;
+	    pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
+	    clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
+	    continue;
+	  }
+      }
+    else
+      {
+	memset(restful->classifyapp_data->appconfig.input_filename, 0, LARGE_FIXED_STRING_SIZE);
+	snprintf(restful->classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "%s", get_config()->image_url);
+      }
 
     syslog(LOG_INFO, "= About to run the detect+classify, %s:%d", __FILE__, __LINE__);
    
