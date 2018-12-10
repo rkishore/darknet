@@ -731,9 +731,7 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
   // char output_resolution[64];
   // classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
   struct tm *ptm;
-  char start_time_string[MEDIUM_FIXED_STRING_SIZE], running_time_string[MEDIUM_FIXED_STRING_SIZE];
-  struct timespec cur_timestamp;
-  long running_time_sec = -1, running_time_rem = -1, running_time_hr = -1; //, running_time_min = -1;
+  char start_time_string[MEDIUM_FIXED_STRING_SIZE];
 
   *response_json = cJSON_CreateObject();
 
@@ -774,12 +772,7 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
       confidence_array_json = cJSON_CreateFloatArray((const float *)restful_ptr->cur_classify_info.results_info.confidence, restful_ptr->cur_classify_info.results_info.num_labels_detected);
       cJSON_AddItemToObject(results_json, "confidence", confidence_array_json);
       cJSON_AddNumberToObject(results_json, "processing_time_in_ms", restful_ptr->cur_classify_info.results_info.processing_time_in_seconds*1000.0);
-      
-      running_time_sec = (long)difftime(restful_ptr->cur_classify_info.end_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
-      running_time_hr = running_time_sec / SECONDS_IN_HOUR;
-      running_time_rem = running_time_sec % SECONDS_IN_HOUR;
-      sprintf(running_time_string, "%02ld:%02ld:%02ld", running_time_hr, running_time_rem / 60, running_time_rem % 60);
-
+            
     } else {
 
       if (cur_classify_status == CLASSIFY_STATUS_STOPPED) {
@@ -787,35 +780,16 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 	cJSON_AddStringToObject(*response_json, "status", "stopped");
 	cJSON_AddNullToObject(*response_json, "error_msg");
 
-	syslog(LOG_DEBUG, "Getting end_timestamp | %p | %d, %s", restful_ptr, __LINE__, __FILE__);
-	running_time_sec = (long)difftime(restful_ptr->cur_classify_info.end_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
-	running_time_hr = running_time_sec / SECONDS_IN_HOUR;
-	running_time_rem = running_time_sec % SECONDS_IN_HOUR;
-	sprintf(running_time_string, "%02ld:%02ld:%02ld", running_time_hr, running_time_rem / 60, running_time_rem % 60);
-
       } else if (cur_classify_status == CLASSIFY_STATUS_ERROR) {
 
 	cJSON_AddStringToObject(*response_json, "status", "error");
 	cJSON_AddStringToObject(*response_json, "error_msg", "classify error: check syslog");
 
-	running_time_sec = (long)difftime(restful_ptr->cur_classify_info.end_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
-	running_time_hr = running_time_sec / SECONDS_IN_HOUR;
-	running_time_rem = running_time_sec % SECONDS_IN_HOUR;
-	sprintf(running_time_string, "%02ld:%02ld:%02ld", running_time_hr, running_time_rem / 60, running_time_rem % 60);
-      
       } else {
 
 	cJSON_AddStringToObject(*response_json, "status", "running");
 	cJSON_AddNullToObject(*response_json, "error_msg");
-
-	// Report running time for this job
-	clock_gettime(CLOCK_REALTIME, &cur_timestamp);      
-      
-	running_time_sec = (long)difftime(cur_timestamp.tv_sec, restful_ptr->cur_classify_info.start_timestamp.tv_sec);
-	running_time_hr = running_time_sec / SECONDS_IN_HOUR;
-	running_time_rem = running_time_sec % SECONDS_IN_HOUR;
-	sprintf(running_time_string, "%02ld:%02ld:%02ld", running_time_hr, running_time_rem / 60, running_time_rem % 60);
-      
+	
       } 
     
     }
@@ -826,8 +800,6 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
     //sprintf(millisec, "%0.3f", (double)(restful_ptr->cur_classify_info.start_timestamp.tv_nsec)/NANOSEC);
     //strcat(start_time_string, millisec);
     cJSON_AddStringToObject(*response_json, "time_started", start_time_string);
-
-    cJSON_AddStringToObject(*response_json, "time_running", running_time_string);
 
   } else {
 
@@ -877,7 +849,6 @@ static void get_response_for_post(restful_comm_struct *restful, cJSON **parsedjs
   ptm = localtime(&restful->cur_classify_info.start_timestamp.tv_sec);
   strftime(start_time_string, sizeof(start_time_string), "%Y/%m/%d %H:%M:%S", ptm);
   cJSON_AddStringToObject(*parsedjson, "time_started", start_time_string);
-  cJSON_AddStringToObject(*parsedjson, "time_running", "00:00:00");
 
   *rendered_json = cJSON_Print(*parsedjson);
 
