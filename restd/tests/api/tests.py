@@ -12,7 +12,8 @@ logging.basicConfig(level=logging.DEBUG,
 
 parser = argparse.ArgumentParser(description="Test classifyapp API")
 parser.add_argument('--addr', help="Address of classifyapp service (e.g. localhost:55555)", default="localhost:10001", type=str, required=True)
-parser.add_argument('--image_name', help="Key of image in script (e.g. 'vehicle1')", default="vehicle1", type=str)
+parser.add_argument('--json_key', help="Key of input JSON in script (e.g. 'sample1')", default="", type=str)
+parser.add_argument('--image_path', help="Path to image which can be either a filepath or a URL. For other input params, defaults will be used (e.g. '/home/igolgi/cnn/test-images/dog.jpg')", default="http://li1249-5.members.linode.com:8080/output/dog.jpg", type=str)
 parser.add_argument('--testpost', help="Set this to 1 to test HTTP POST (default=0)", default=0, type=int)
 parser.add_argument('--testgets', help="Use this to test HTTP GET (single). Provide job_id as argument. (default=-1)", default=-1, type=int)
 parser.add_argument('--testdelete', help="Use this to test HTTP DELETE. Provide job_id as argument. (default=-1)", default=-1, type=int)
@@ -44,6 +45,19 @@ values_json_dict = {
             "detection_threshold": 0.5,
         },
     },
+    "sample3": {
+        "input": "/home/igolgi/cnn/test-images/dog.jpg",
+        "type": "file",
+        "output_dir": "/tmp",
+        "output_fileprefix": "TEST1",
+        "config": {
+            # "data_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
+            # "network_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
+            # "weights_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
+            "detection_threshold": 0.5,
+        },
+    },
+
 }
 
 #values = json.dumps(values_json)
@@ -127,14 +141,18 @@ def test_erroneous_input(service_addr):
 
 '''
 
-def test_post(service_addr, image_name):
+def test_post(service_addr, json_key, json_key_used=False, input_json_val=None):
     ''''if not data_tosend:
         request = Request('http://%s/api/v0/classify' % (service_addr,), data=values, headers=headers)
     else:
         request = Request('http://%s/api/v0/classify' % (service_addr,), data=data_tosend, headers=headers)
         '''
-    
-    values = json.dumps(values_json_dict[image_name])
+
+    if json_key_used == True:
+        values = json.dumps(values_json_dict[json_key])
+    else:
+        values = json.dumps(input_json_val)
+        
     #print values
     request = Request('http://%s/api/v0/classify' % (service_addr,), data=values, headers=headers)
     retval = 0
@@ -222,102 +240,6 @@ def test_delete_single(service_addr, jobid_list):
     return
 
 
-def process_split_filelist(input_mp4file_list, service_endpoint_id):
-
-    local_values_json = {
-        "input": "/mnt/bigdrive2/IQMediaPAL_B_20141218_1440.mp4",
-        "output": "/tmp/IQMediaPAL_B_20141218_1440-output.mp4",
-        "config": {
-            "output_format": "360x240",
-            "bitrate_kbps": 300,
-            "quality": 1
-        }
-    }
-    
-    local_values = json.dumps(local_values_json)
-
-    cur_service_endpoint = service_addr_list[service_endpoint_id]
-
-    logging.debug(str(cur_service_endpoint) + " | idx = " + str(service_endpoint_id))
-
-    #logging.debug(str(input_mp4file_list))
-
-    files_processed = 0
-    for inputfile in input_mp4file_list:
-
-        local_values_json["input"] = inputfile
-        local_values_json["output"] = inputfile.replace("input", "output").split(".mp4")[0] + "-output.mp4"
-        local_values = json.dumps(local_values_json)
-        logging.debug(str(cur_service_endpoint) + " | " + str(local_values_json))
-
-        # Test HTTP POST 
-        post_retval = test_post(cur_service_endpoint, local_values)
-        if (post_retval < 0):
-            for i in range(0, MAX_POST_RETRIES):
-                time.sleep(5)
-                post_retval = test_post(cur_service_endpoint, local_values)
-                if post_retval == 0:
-                    break
-        
-        # Test HTTP GET (all)
-        job_ids = []
-        response_body = test_get_all(cur_service_endpoint)
-        if (response_body):
-            decoded_json = json.loads(response_body)
-            for job_info in decoded_json:
-                if "id" in job_info and "status" in job_info and job_info["status"] == "running":
-                    job_ids.append(job_info["id"])
-                    break
-                    
-            if (len(job_ids)):
-                still_running = True
-                while(still_running):
-                    response_body2 = test_get_single(cur_service_endpoint, job_ids)
-                    decoded_json2 = json.loads(response_body2)
-                    if "status" in decoded_json2 and decoded_json2["status"] != "running":
-                        still_running = False
-                    else:
-                        logging.debug(str(decoded_json2["id"]) + " | " + str(decoded_json2["input"]) + " | " + str(decoded_json2["percentage_finished"]) +\
-                                      " | " + str(cur_service_endpoint) + " | " + str(files_processed))
-                        
-                    if (still_running):
-                        time.sleep(5)
-                        
-                files_processed += 1
-
-        else:
-            logging.debug("No response!")
-    
-    
-
-'''
-    elif (cmdline_args.testall):
-
-        # Test HTTP POST 
-        test_post(service_addr_list[0], cmdline_args.station)
-
-        # Test HTTP GET (all)
-        response_body = test_get_all(service_addr_list[0])
-
-        # Test HTTP GET (single) and DELETE
-        if (response_body):
-            job_ids = []
-            decoded_json = json.loads(response_body)
-            for job_info in decoded_json:
-                if "id" in job_info:
-                    job_ids.append(job_info["id"])
-
-            print "= Sleeping for some time (5s) before deleting the running job..."
-            time.sleep(5) # let the job start and run for a bit
-            test_get_single(service_addr_list[0], job_ids)
-            test_delete_single(service_addr_list[0], job_ids)
-            # Get job state after delete
-            test_get_single(service_addr_list[0], job_ids)            
-
-        else:
-            print "= Could not execute HTTP GET (single) and HTTP DELETE (single) as HTTP GET (all) failed"            
-'''
-
 ''' main() '''
 if __name__ == "__main__":
     
@@ -329,8 +251,23 @@ if __name__ == "__main__":
 
     if (cmdline_args.testpost):
 
-        # Test HTTP POST 
-        test_post(service_addr_list[0], cmdline_args.image_name)
+        if (len(cmdline_args.json_key) > 0):
+            # Test HTTP POST 
+            test_post(service_addr_list[0], cmdline_args.json_key, True, None)
+        else:
+            input_json = {
+                "input": cmdline_args.image_path,
+                "type": "file",
+                "output_dir": "/tmp",
+                "output_fileprefix": "TEST1",
+                "config": {
+                    # "data_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
+                    # "network_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
+                    # "weights_config_file": "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
+                    "detection_threshold": 0.5,
+                },
+            }
+            test_post(service_addr_list[0], None, False, input_json)
 
     elif (cmdline_args.testgets >= 0):
 
