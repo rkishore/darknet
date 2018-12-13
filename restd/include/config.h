@@ -18,6 +18,7 @@ struct Config
   char           dnn_data_file[LARGE_FIXED_STRING_SIZE];
   char           dnn_config_file[LARGE_FIXED_STRING_SIZE];
   char           dnn_weights_file[LARGE_FIXED_STRING_SIZE];
+  char           data_folder_path[LARGE_FIXED_STRING_SIZE];
 
   unsigned int   daemon_port;
   char           image_url[LARGE_FIXED_STRING_SIZE];

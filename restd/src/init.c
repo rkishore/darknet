@@ -67,6 +67,8 @@ get_info_from_cmdline_args(int *argc, char **argv)
       {"dnn-weights-file", required_argument, 0, 'c'},
       {"detection-thresh", required_argument, 0, 'd'},
       {"dnn-data-file", required_argument, 0, 'e'},
+      {"daemon-port", required_argument, 0, 'f'},
+      {"data-folder-path", required_argument, 0, 'g'},
       {"log-level", required_argument, 0, 'L'},
       {"help", no_argument, 0, 'h' },
       {"version", no_argument, 0, 'v' },
@@ -74,7 +76,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
     };
 
     int option_index = 0;
-    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:L:hv", 
+    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:L:hv", 
 			long_options,
                         &option_index);
     int sizeof_char_ptr = sizeof(char *);
@@ -107,6 +109,10 @@ get_info_from_cmdline_args(int *argc, char **argv)
     case 'f':
       mod_config()->daemon_port = atoi(optarg);
       break;
+    case 'g':
+      memset(mod_config()->data_folder_path, 0, LARGE_FIXED_STRING_SIZE);
+      memcpy(mod_config()->data_folder_path, optarg, strlen(optarg));      
+      break;
     case 'L' : 
       //      mod_config()->debug_level = optarg;
       memcpy(mod_config()->debug_level, optarg, sizeof_char_ptr);  
@@ -129,12 +135,13 @@ get_info_from_cmdline_args(int *argc, char **argv)
       exit(EXIT_FAILURE);
     }
 
-  fprintf(stderr, "= CMDLINE args | dnn_data_file: %s | dnn_config_file: %s | dnn_weights_file: %s | detection_thresh: %0.1f | iface_name: %s\n",
+  fprintf(stderr, "= CMDLINE args | dnn_data_file: %s | dnn_config_file: %s | dnn_weights_file: %s | detection_thresh: %0.1f | iface_name: %s | data_folder_path: %s\n",
 	  get_config()->dnn_data_file,
 	  get_config()->dnn_config_file,
 	  get_config()->dnn_weights_file,
 	  get_config()->detection_threshold,
-	  get_config()->interface_name);
+	  get_config()->interface_name,
+	  get_config()->data_folder_path);
   
   return;
 }
@@ -234,6 +241,45 @@ job_control_init()
 }
 */
 
+void
+check_if_key_files_and_paths_exist()
+{
+
+  // Check if directory exists 
+  if ( ( access(get_config()->dnn_data_file, F_OK ) == -1 ) ||
+       ( access(get_config()->dnn_config_file, F_OK ) == -1 ) ||
+       ( access(get_config()->dnn_weights_file, F_OK ) == -1 ) ||
+       ( access(get_config()->data_folder_path, F_OK ) == -1 ) ) {
+    
+    if ( access(get_config()->dnn_data_file, F_OK ) == -1 )
+      {
+	fprintf(stderr, "= DNN data file %s does not exist. Exiting.\n", get_config()->dnn_data_file);
+	syslog(LOG_ERR, "= DNN data file %s does not exist. Exiting.", get_config()->dnn_data_file);
+      }
+    
+    if ( access(get_config()->dnn_config_file, F_OK ) == -1 )
+      {
+	fprintf(stderr, "= DNN config file %s does not exist. Exiting.\n", get_config()->dnn_config_file);
+	syslog(LOG_ERR, "= DNN config file %s does not exist. Exiting.", get_config()->dnn_config_file);
+      }
+    
+    if ( access(get_config()->dnn_weights_file, F_OK ) == -1 )
+      {
+	fprintf(stderr, "= DNN weights file %s does not exist. Exiting.\n", get_config()->dnn_weights_file);
+	syslog(LOG_ERR, "= DNN weights file %s does not exist. Exiting.", get_config()->dnn_weights_file);
+      }
+    
+    if ( access(get_config()->data_folder_path, F_OK ) == -1 )
+      {
+	fprintf(stderr, "= Data folder path %s does not exist. Exiting.\n", get_config()->data_folder_path);
+	syslog(LOG_ERR, "= Data folder path %s does not exist. Exiting.", get_config()->data_folder_path);
+      }
+
+    exit(-1);
+  }
+
+}
+
 void 
 basic_initialization(int *argc, char **argv, char *identity)
 {
@@ -241,6 +287,9 @@ basic_initialization(int *argc, char **argv, char *identity)
   /* getopt args to parse command linearguments */
   get_info_from_cmdline_args(argc, argv);
 
+  /* Verify if path to cfg, weights, data and data_folder_path exist */
+  check_if_key_files_and_paths_exist();
+  
   /* Check if license key exists */
   verify_license();
 
@@ -260,106 +309,6 @@ basic_initialization(int *argc, char **argv, char *identity)
       curl_global_cleanup();
       exit(-1);
     }
-
-  /*  
-  if (config_curl_hdl(&audio_url_ptr->curl_data) < 0)
-    {
-      syslog(LOG_ERR, "= Could not initialize curl_hdl_for_src. Exiting.\n");
-      cleanup_and_exit();
-      exit(-1);
-    }
-
-  if ((thread_info_inst->data_ipaddr = malloc(NI_MAXHOST * sizeof(char))) == NULL)
-    {
-      syslog(LOG_ERR, "= Error assigning memory for data_ipaddr\n");      
-      cleanup_and_exit();
-      exit(-1);
-    }
-
-  // Get the IP address of the eth0 interface of this Node 
-  if (get_iface_IP(identity, thread_info_inst->data_ipaddr) < 0) 
-    {
-      syslog(LOG_ERR, "Error accessing IP address of eth0 interface. Exiting.\n");
-      cleanup_and_exit();
-      free_mem(thread_info_inst->data_ipaddr);
-      exit(-1);
-    }
-  */
-
-
-  /* Initialize CURL control connection to DB for monitoring */
-  /* if (!get_config()->cmdline_mode)
-    {
-      if (config_curl_hdl(&thread_info_inst->curl_hdl_for_monit) < 0)
-	{
-	  syslog(LOG_ERR, "= Could not initialize curl_hdl_for_monit. Exiting.\n");
-	  cleanup_and_exit();
-	  free_mem(thread_info_inst->data_ipaddr);
-	  exit(-1);
-	}
-
-      if (!get_config()->partial_exec_mode)
-	{
-	  // Initialize CURL control connection to DB for phase1 
-	  if (config_curl_hdl(&thread_info_inst->curl_hdl_for_p1) < 0)
-	    {
-	      syslog(LOG_ERR, "= Could not initialize curl_hdl_for_p1. Exiting.\n");
-	      curl_easy_cleanup(thread_info_inst->curl_hdl_for_monit);
-	      cleanup_and_exit();
-	      free_mem(thread_info_inst->data_ipaddr);
-	      exit(-1);
-	    }
-
-	  // Initialize CURL control connection to DB for phase2 
-	  if (config_curl_hdl(&thread_info_inst->curl_hdl_for_p2) < 0)
-	    {
-	      syslog(LOG_ERR, "= Could not initialize curl_hdl_for_p2. Exiting.\n");
-	      curl_easy_cleanup(thread_info_inst->curl_hdl_for_monit);
-	      curl_easy_cleanup(thread_info_inst->curl_hdl_for_p1);
-	      cleanup_and_exit();
-	      free_mem(thread_info_inst->data_ipaddr);
-	      exit(-1);
-	    }
-	}
-      else
-	{
-	  thread_info_inst->curl_hdl_for_p1 = NULL;
-	  thread_info_inst->curl_hdl_for_p2 = NULL;
-	}
-
-      // Initialize CURL control connection to DB for phase3 
-      if (config_curl_hdl(&thread_info_inst->curl_hdl_for_p3) < 0)
-	{
-	  syslog(LOG_ERR, "= Could not initialize curl_hdl_for_p3. Exiting.\n");
-	  curl_easy_cleanup(thread_info_inst->curl_hdl_for_monit);
-	  if (thread_info_inst->curl_hdl_for_p1)
-	    curl_easy_cleanup(thread_info_inst->curl_hdl_for_p1);
-	  if (thread_info_inst->curl_hdl_for_p2)
-	    curl_easy_cleanup(thread_info_inst->curl_hdl_for_p2);
-	  cleanup_and_exit();
-	  free_mem(thread_info_inst->data_ipaddr);
-	  exit(-1);
-	}
-
-    }
-  */
-  /*
-  if (job_control_init() < 0) {
-    syslog(LOG_ERR, "= Error initializing items related to job_control. Exiting.\n");
-    if (!get_config()->cmdline_mode)
-      {
-	curl_easy_cleanup(thread_info_inst->curl_hdl_for_monit);
-	if (thread_info_inst->curl_hdl_for_p1)
-	  curl_easy_cleanup(thread_info_inst->curl_hdl_for_p1);
-	if (thread_info_inst->curl_hdl_for_p2)
-	  curl_easy_cleanup(thread_info_inst->curl_hdl_for_p2);
-	curl_easy_cleanup(thread_info_inst->curl_hdl_for_p3);
-      }
-    cleanup_and_exit();
-    free_mem(thread_info_inst->data_ipaddr);
-    exit(-1);
-  }
-  */
 
   return;
 }

@@ -4,6 +4,7 @@
 #include "cuda.h"
 #include <stdio.h>
 #include <math.h>
+#include "config.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -228,8 +229,8 @@ image **load_alphabet()
     for(j = 0; j < nsize; ++j){
         alphabets[j] = calloc(128, sizeof(image));
         for(i = 32; i < 127; ++i){
-            char buff[256];
-            sprintf(buff, "data/labels/%d_%d.png", i, j);
+            char buff[512];
+            sprintf(buff, "%s/labels/%d_%d.png", get_config()->data_folder_path, i, j);
             alphabets[j][i] = load_image_color(buff, 0, 0);
         }
     }

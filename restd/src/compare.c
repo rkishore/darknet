@@ -20,7 +20,12 @@ void train_compare(char *cfgfile, char *weightfile)
     }
     printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
     int imgs = 1024;
-    list *plist = get_paths("data/compare.train.list");
+
+    char train_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(train_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(train_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.list", get_config()->data_folder_path);
+
+    list *plist = get_paths(train_file_path);
     char **paths = (char **)list_to_array(plist);
     int N = plist->size;
     printf("%d\n", N);
@@ -87,7 +92,11 @@ void validate_compare(char *filename, char *weightfile)
     }
     srand(time(0));
 
-    list *plist = get_paths("data/compare.val.list");
+    char compare_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(compare_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(compare_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/compare.val.list", get_config()->data_folder_path);
+
+    list *plist = get_paths(compare_file_path);
     //list *plist = get_paths("data/compare.val.old");
     char **paths = (char **)list_to_array(plist);
     int N = plist->size/2;
@@ -234,7 +243,11 @@ void SortMaster3000(char *filename, char *weightfile)
     srand(time(0));
     set_batch_network(&net, 1);
 
-    list *plist = get_paths("data/compare.sort.list");
+    char compare_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(compare_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(compare_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/compare.sort.list", get_config()->data_folder_path);
+
+    list *plist = get_paths(compare_file_path);
     //list *plist = get_paths("data/compare.val.old");
     char **paths = (char **)list_to_array(plist);
     int N = plist->size;
@@ -266,7 +279,11 @@ void BattleRoyaleWithCheese(char *filename, char *weightfile)
     srand(time(0));
     set_batch_network(&net, 1);
 
-    list *plist = get_paths("data/compare.sort.list");
+    char compare_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(compare_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(compare_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/compare.sort.list", get_config()->data_folder_path);
+
+    list *plist = get_paths(compare_file_path);
     //list *plist = get_paths("data/compare.small.list");
     //list *plist = get_paths("data/compare.cat.list");
     //list *plist = get_paths("data/compare.val.old");

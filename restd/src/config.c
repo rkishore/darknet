@@ -44,6 +44,7 @@ void print_usage(const char *app_name)
   fprintf(stderr, "\n");
   fprintf(stderr, "params (mandatory):\n");
   fprintf(stderr, "-a, --interface-name | Primary network interface name (used for licensing purposes) | Default: %s \n", get_config()->interface_name);
+  fprintf(stderr, "-g, --data-folder-path | Location of data folder path | Default: %s \n", get_config()->data_folder_path);
   fprintf(stderr, "\nparams (optional): \n");
   fprintf(stderr, "-b, --dnn-config-file | Filesystem location of the dnn config file | Default: %s\n", get_config()->dnn_config_file);
   fprintf(stderr, "-c, --dnn-weights-file | Filesystem location of the dnn weights file | Default: %s\n", get_config()->dnn_weights_file);
@@ -129,17 +130,17 @@ void fill_default_config()
     }
 
   memset(&config->dnn_data_file[0], 0, LARGE_FIXED_STRING_SIZE);
-  // strcpy(&config->dnn_config_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/cfg/yolov3-rwh.cfg");
   strcpy(&config->dnn_data_file[0], (const char *)"/usr/local/share/classifyapp/cfg/coco.data");
 
   memset(&config->dnn_config_file[0], 0, LARGE_FIXED_STRING_SIZE);
-  // strcpy(&config->dnn_config_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/cfg/yolov3-rwh.cfg");
   strcpy(&config->dnn_config_file[0], (const char *)"/usr/local/share/classifyapp/cfg/yolov3.cfg");
 
   memset(&config->dnn_weights_file[0], 0, LARGE_FIXED_STRING_SIZE);
-  //strcpy(&config->dnn_weights_file[0], (const char *)"/home/igolgi/cnn/yolo/darknet/yolov3.weights");
   strcpy(&config->dnn_weights_file[0], (const char *)"/usr/local/share/classifyapp/cfg/yolov3.weights");
-      
+
+  memset(&config->data_folder_path[0], 0, LARGE_FIXED_STRING_SIZE);
+  strcpy(&config->data_folder_path[0], (const char *)"/usr/local/share/classifyapp/data/");
+
   config->detection_threshold = 0.5;
   config->daemon_port = 55555;
   

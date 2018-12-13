@@ -2,6 +2,7 @@
 #include "list.h"
 #include "data.h"
 #include "restful.h"
+#include "config.h"
 
 static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90};
 
@@ -9,9 +10,13 @@ static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,2
 void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
 {
     list *options = read_data_cfg(datacfg);
-    char *train_images = option_find_str(options, "train", "data/train.list");
+    char train_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    char *train_images = NULL;
     char *backup_directory = option_find_str(options, "backup", "/backup/");
 
+    memset(train_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(train_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.list", get_config()->data_folder_path);
+    train_images = option_find_str(options, "train", train_file_path);
     srand(time(0));
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
@@ -238,14 +243,25 @@ void validate_detector_flip(char *datacfg, char *cfgfile, char *weightfile, char
 {
     int j;
     list *options = read_data_cfg(datacfg);
-    char *valid_images = option_find_str(options, "valid", "data/train.list");
-    char *name_list = option_find_str(options, "names", "data/names.list");
+    char train_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    char *valid_images = NULL;
+    char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    char *name_list = NULL;
     char *prefix = option_find_str(options, "results", "results");
-    char **names = get_labels(name_list);
+    char **names = NULL;
     char *mapf = option_find_str(options, "map", 0);
     int *map = 0;
     if (mapf) map = read_map(mapf);
 
+    memset(train_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(train_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.list", get_config()->data_folder_path);
+    valid_images = option_find_str(options, "valid", train_file_path);
+    
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+    name_list = option_find_str(options, "names", names_file_path);
+    names = get_labels(name_list);
+ 
     network *net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 2);
     fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
@@ -368,13 +384,24 @@ void validate_detector(char *datacfg, char *cfgfile, char *weightfile, char *out
 {
     int j;
     list *options = read_data_cfg(datacfg);
-    char *valid_images = option_find_str(options, "valid", "data/train.list");
-    char *name_list = option_find_str(options, "names", "data/names.list");
+    char train_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    char *valid_images = NULL;
+    char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    char *name_list = NULL;
     char *prefix = option_find_str(options, "results", "results");
-    char **names = get_labels(name_list);
+    char **names = NULL;
     char *mapf = option_find_str(options, "map", 0);
     int *map = 0;
     if (mapf) map = read_map(mapf);
+
+    memset(train_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(train_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.list", get_config()->data_folder_path);
+    valid_images = option_find_str(options, "valid", train_file_path);
+    
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+    name_list = option_find_str(options, "names", names_file_path);
+    names = get_labels(name_list);
 
     network *net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 1);
@@ -496,7 +523,11 @@ void validate_detector_recall(char *cfgfile, char *weightfile)
     fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
     srand(time(0));
 
-    list *plist = get_paths("data/coco_val_5k.list");
+    char coco_val_5k_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(coco_val_5k_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(coco_val_5k_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/coco_val_5k.list", get_config()->data_folder_path);
+    
+    list *plist = get_paths(coco_val_5k_path);
     char **paths = (char **)list_to_array(plist);
 
     layer l = net->layers[net->n-1];
@@ -565,10 +596,11 @@ void validate_detector_recall(char *cfgfile, char *weightfile)
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen)
 {
     list *options = read_data_cfg(datacfg);
-    char *name_list = option_find_str(options, "names", "data/names.list");
-    int names_array_len = get_num_labels(name_list);
-    char **names = get_labels(name_list);
-
+    char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    char *name_list = NULL;
+    int names_array_len = -1;
+    char **names = NULL;
+    
     image **alphabet = load_alphabet();
     network *net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 1);
@@ -578,7 +610,13 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     char *input = buff;
     float nms=.45;
     int i = 0, j = 0, nsize=8;
-    
+
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+    name_list = option_find_str(options, "names", names_file_path);
+    names_array_len = get_num_labels(name_list);
+    names = get_labels(name_list);
+
     while(1){
         if(filename){
             strncpy(input, filename, 256);
@@ -641,8 +679,13 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 
 void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datacfg, char *cfgfile, char *weightfile)
 {
+  
+  char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+  memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+  snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+
   prep_netinfo->options = read_data_cfg(datacfg);
-  prep_netinfo->name_list = option_find_str(prep_netinfo->options, "names", "data/names.list");
+  prep_netinfo->name_list = option_find_str(prep_netinfo->options, "names", names_file_path);
   prep_netinfo->names_array_len = get_num_labels(prep_netinfo->name_list);
   prep_netinfo->names = get_labels(prep_netinfo->name_list);
   prep_netinfo->alphabet = load_alphabet();
@@ -984,8 +1027,14 @@ void run_detector(int argc, char **argv)
     else if(0==strcmp(argv[2], "demo")) {
         list *options = read_data_cfg(datacfg);
         int classes = option_find_int(options, "classes", 20);
-        char *name_list = option_find_str(options, "names", "data/names.list");
-        char **names = get_labels(name_list);
+	char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+        char *name_list = NULL;
+        char **names = NULL;
+
+	memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+	snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+	name_list = option_find_str(options, "names", names_file_path);
+	names = get_labels(name_list);
         demo(cfg, weights, thresh, cam_index, filename, names, classes, frame_skip, prefix, avg, hier_thresh, width, height, fps, fullscreen);
     }
     //else if(0==strcmp(argv[2], "extract")) extract_detector(datacfg, cfg, weights, cam_index, filename, class, thresh, frame_skip);
