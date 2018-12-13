@@ -50,6 +50,7 @@ void print_usage(const char *app_name)
   fprintf(stderr, "-c, --dnn-weights-file | Filesystem location of the dnn weights file | Default: %s\n", get_config()->dnn_weights_file);
   fprintf(stderr, "-d, --detection-thresh | Detection threshold below which objects detected are not reported | Default: %0.1f\n", get_config()->detection_threshold);
   fprintf(stderr, "-e, --dnn-data-file | Filesystem location of the dnn data file | Default: %s\n", get_config()->dnn_data_file);
+  fprintf(stderr, "-f, --data-folder-path | Filesystem location of the dnn data folder | Default: %s\n", get_config()->data_folder_path);
   fprintf(stderr, "-L, --log-level | Set the syslog LOG LEVEL | Default: LOG_INFO (%s) \n", get_config()->debug_level);
   fprintf(stderr, "-f, --port [port number] | Port daemon is listening on for REST-ful API | Default = %d (if unspecified)\n", get_config()->daemon_port);
   

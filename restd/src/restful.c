@@ -510,7 +510,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
       return -1;
 
     if (store_input_type(&input_type_data, cur_classifyapp_data, return_http_flag) < 0) 
-      return -1;    
+      return -1;
 
     if (store_output_file_loc(&output_dir, &output_fileprefix, cur_classifyapp_data, return_http_flag) < 0) 
       return -1;
@@ -632,7 +632,7 @@ static int parse_input_request_data(uint32_t **input_request_data,
     
     if ( !strcmp(http_method, "POST") ) {
       
-      syslog(LOG_INFO, "= %s %s | restful_ptr: %p", http_method, uri, restful_ptr);
+      syslog(LOG_DEBUG, "= %s %s | restful_ptr: %p", http_method, uri, restful_ptr);
 
       lineptr = strstr((const char *)*input_request_data, "\r\n\r\n");
       if (!lineptr) {      

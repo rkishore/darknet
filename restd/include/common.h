@@ -1,7 +1,7 @@
 /**************************************************************
  * common.h - common header file for CLASSIFYAPP
  *          
- * Copyright (C) 2015 Zipreel Inc.
+ * Copyright (C) 2018 igolgi Inc.
  *
  * Confidential and Proprietary Source Code
  *
@@ -55,6 +55,7 @@
 #define SECONDS_IN_HOUR 3600
 #define SECONDS_IN_MINUTE 60
 #define WAVHDR_DEBUG 1
+#define MAX_SIMULTANEOUS_JOBS 5
 
 typedef uint64_t u64;
 typedef int64_t i64;
@@ -62,14 +63,10 @@ typedef unsigned int u32;
 
 typedef struct _classifyapp_config_struct_ {
 
-  //int  channel;
   char input_url[LARGE_FIXED_STRING_SIZE];
   char input_type[SMALL_FIXED_STRING_SIZE];
   char output_directory[LARGE_FIXED_STRING_SIZE];
   char output_fileprefix[LARGE_FIXED_STRING_SIZE];
-  //char acoustic_model[LARGE_FIXED_STRING_SIZE];
-  //char dictionary[LARGE_FIXED_STRING_SIZE];
-  //char language_model[LARGE_FIXED_STRING_SIZE];
   float detection_threshold;
   //bool crash_recovery_flag;
   char input_filename[LARGE_FIXED_STRING_SIZE];
@@ -88,22 +85,10 @@ typedef struct _classifyapp_struct_ {
     
   void                     *input_packet_buffer_pool;
   sem_t                    *input_packet_sem;
-
-  /* 
-  void                     *speech_proc_packet_queue;
-  sem_t                    *speech_proc_queue_sem;
-
-  void                     *speech_proc_packet_buffer_pool;
-  sem_t                    *speech_proc_packet_sem;
-  */
   
   void                     *system_message_pool;
 
-  // void                     *audio_decoder_buffer_pool;
-
   pthread_t                input_thread_id;
-
-  // pthread_t                audio_decoder_thread_id;
   pthread_t                proc_thread_id;
 
   CURL                     *curl_data;
@@ -113,27 +98,10 @@ typedef struct _classifyapp_struct_ {
 
   u64                      cur_input_packet_fill;
   uint8_t                  *cur_input_packet;
-
-  /*
-  u64                      cur_speech_proc_packet_fill;
-  uint8_t                  *cur_speech_proc_packet;
-  FILE                     *cur_speech_proc_packet_fd;
-  */
   
   pthread_mutex_t          http_input_thread_complete_mutex;
   bool                     http_input_thread_complete;
 
-  /* 
-  pthread_mutex_t          audio_decoder_thread_complete_mutex;
-  bool                     audio_decoder_thread_complete;
-
-  pthread_mutex_t          speech_proc_thread_complete_mutex;
-  bool                     speech_proc_thread_complete;
-
-  pthread_mutex_t          input_codec_mutex;
-  pthread_mutex_t          input_fmt_ctx_mutex;
-  */
-  
   uint64_t                 decoded_frame_count;
   uint64_t                 decoded_total_bytes;
 
@@ -142,24 +110,8 @@ typedef struct _classifyapp_struct_ {
   struct timespec          pull_start_timestamp;
   int64_t                  pull_start_ts_high, pull_start_ts_low, pull_end_ts_high, pull_end_ts_low;
 
-  /* 
-  struct timespec          audio_decoder_start_timestamp;
-  int64_t                  audio_decode_start_ts_high, audio_decode_start_ts_low, audio_decode_end_ts_high, audio_decode_end_ts_low;
-  double                   audio_decode_buf_fill_sofar, num_audio_decode_bufs_sofar, expected_total_audio_decode_buf_fill_sofar;
-  double                   ewma_audio_decode_buf_fill;
-
-  pthread_mutex_t          audio_decode_buf_mutex;
-  */
-  
   void                     *event_message_queue;
   void                     *event_message_pool;
-
-  /* 
-  int                      audio_decode_read_frame_retries;
-  int                      audio_decode_read_frame_backoff;  
-  int                      full_process_retries;
-  int                      full_process_retry_backoff;
-  */
   
   igolgi_message_struct    *cur_message_wrapper;
 
@@ -171,63 +123,6 @@ typedef struct _classifyapp_struct_ {
   FILE                     *samplefptr;
 
 } classifyapp_struct;
-
-/* 
-typedef struct _speech_proc_hyp_struct_ {
-
-  classifyapp_struct          *classifyapp_inst;
-
-  ps_decoder_t             *ps;
-  cmd_ln_t                 *sphinx_config_obj;
-
-  char                     waveheader[WAV_HEADER_SIZE];
-
-  uint8_t                  *raw_audio_buf;
-  int                      raw_audio_bufsize, this_wav_buf_writesize, next_wav_buf_writesize;
-  int                      raw_audio_buf_num, num_blocks_to_skip_get_hyp;
-  pthread_mutex_t          speech_proc_condwait_mutex;
-  pthread_cond_t           speech_proc_cond_var;
-  uint8_t                  speech_proc_cond_boolean_predicate;
-  double                   last_out_nspeech, out_nspeech, out_ncpu, out_nwall; // cumulative speech stats reported by pocketsphinx
-  double                   utt_nspeech, utt_ncpu, utt_nwall; // speech stats for a particular utterance reported by pocketsphinx
-  struct timespec          start_timestamp, ps_decoder_init_timestamp;
-  double                   num_bufs_dropped;
-  uint8_t                  last_buf_dropped, header_written, footer_written;
-  FILE                     *output_xml_fptr, *output_wav_fptr;
-
-#ifdef WAVHDR_DEBUG
-  FILE                     *output_wavhdr_fptr;
-  bool                     invalid_wav_hdr;
-#endif
-
-  struct timespec          output_file_opentime;
-  double                   first_pull_start_timestamp_high, first_pull_start_timestamp_low;
-  int64_t                  pull_start_timestamp_high, pull_start_timestamp_low, pull_end_timestamp_high, pull_end_timestamp_low;
-  //int64_t                  first_decode_start_timestamp_high, first_decode_start_timestamp_low;
-  int64_t                  audio_decode_start_timestamp_high, audio_decode_start_timestamp_low, audio_decode_end_timestamp_high, audio_decode_end_timestamp_low;
-  char                     time_string[MEDIUM_FIXED_STRING_SIZE];
-
-  double                   first_speech_decode_start_time, total_speech_proc_time, num_speech_blocks_proc;
-
-  char                     input_container[SMALL_FIXED_STRING_SIZE], input_codec[SMALL_FIXED_STRING_SIZE];
-
-  int                      output_file_idx, cur_output_packet_size;
-  
-  uint64_t                 interval_cnt;
-  int64_t                  output_tvsec;
-
-  struct tm                outputfile_ptm;
-  double                   cur_block_start_timestamp, exp_block_ts_after_proc;
-  bool                     speech_proc_cond_vars_init, retry_not_handled;
-  int                      retry_num;
-
-  const char               *hyp;
-  const char               *uttid;
-  FILE                     *rawfd;
-  struct timespec          cur_buf_start_timestamp, prev_timestamp, cur_timestamp;  
-
-} speech_proc_hyp_struct;
-*/
 
 #define __PRINTF(fmt, args...) { fprintf(stdout, fmt , ## args); fflush(stdout); }
 #define DEBUG_PRINTF(fmt, args...) __PRINTF(fmt , ## args)
