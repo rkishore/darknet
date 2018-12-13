@@ -1,0 +1,10 @@
+[Unit]
+Description=igolgi classifyapp %i
+#Wants=nginx.service
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/classifyapp -a eth0 -b /usr/local/share/classifyapp/cfg/yolov3-rwh.cfg -f 1000%i
+
+[Install]
+WantedBy=multi-user.target
