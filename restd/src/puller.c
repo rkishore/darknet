@@ -79,9 +79,12 @@ static int pull_specified_byte_range(classifyapp_struct *classifyapp_inst, char 
 	((retval == CURLE_WRITE_ERROR) && (classifyapp_inst->bytes_pulled < SAMPLE_FILE_THRESHOLD_BYTES));
       
       if (print_err)
-	syslog(LOG_ERR, "curl_easy_perform() failed: %s/%d @ %s, line %d\n",
-	       curl_easy_strerror(retval), retval,
-	       __FILE__, __LINE__);
+	{
+	  syslog(LOG_ERR, "curl_easy_perform() failed: %s/%d @ %s, line %d\n",
+		 curl_easy_strerror(retval), retval,
+		 __FILE__, __LINE__);
+	  retval = -1;
+	}
     }
   
   if ((byte_range_str != NULL) && (byte_range != NULL))

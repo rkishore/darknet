@@ -743,7 +743,7 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
   pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
   cur_classify_status = restful_ptr->cur_classify_info.classify_status;
   pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);
-
+  
   cJSON_AddNumberToObject(*response_json, "id", restful_ptr->cur_classify_info.classify_id);
 
   if (restful_ptr->cur_classify_info.classify_id >= 0) {
@@ -784,6 +784,16 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 
 	cJSON_AddStringToObject(*response_json, "status", "error");
 	cJSON_AddStringToObject(*response_json, "error_msg", "classify error: check syslog");
+
+      } else if (cur_classify_status == CLASSIFY_STATUS_INPUT_ERROR) {
+
+	cJSON_AddStringToObject(*response_json, "status", "error");
+	cJSON_AddStringToObject(*response_json, "error_msg", "Input URL/path invalid");
+
+      } else if (cur_classify_status == CLASSIFY_STATUS_OUTPUT_ERROR) {
+
+	cJSON_AddStringToObject(*response_json, "status", "error");
+	cJSON_AddStringToObject(*response_json, "error_msg", "Output folder does not exist");
 
       } else {
 

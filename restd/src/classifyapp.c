@@ -174,19 +174,21 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
 static int check_input_url(restful_comm_struct *restful_ptr) 
 {
 
-  int txtcheck = -1;
+  int txtcheck = -1, retval = 0;
   char *samplefilename = NULL, *filecmd = NULL;
   
   if (config_curl_and_pull_file_sample(restful_ptr->classifyapp_data) < 0)
     {
-      syslog(LOG_ERR, "= Could not check file for file type");
-      return -1;
+      syslog(LOG_ERR, "= Could not check file for file type from input_url, %s:%d", __FILE__, __LINE__);
+      retval = -1;
+      goto exit_check_input_url;
     }    
 
   if (asprintf(&samplefilename, "%s/%s", restful_ptr->classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
     {
       syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
-      return -1;
+      retval = -1;
+      goto exit_check_input_url;
     }
   
   if (asprintf(&filecmd, "/usr/bin/file %s | grep text", samplefilename) < 0)
@@ -194,7 +196,8 @@ static int check_input_url(restful_comm_struct *restful_ptr)
       syslog(LOG_ERR, "= Could not asprintf filecmd, %s:%d", __FILE__, __LINE__);
       free(samplefilename);
       samplefilename = NULL;
-      return -1;
+      retval = -1;
+      goto exit_check_input_url;
     }
 
   txtcheck = system(filecmd);  
@@ -206,15 +209,19 @@ static int check_input_url(restful_comm_struct *restful_ptr)
   filecmd = NULL;
   
   if (!txtcheck)
-    return -1;
-
+    {
+      retval = -1;
+      goto exit_check_input_url;
+    }
+  
   if ( !( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) ) )
     {
       syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
-      return -1;
+      retval = -1;
     }
-  
-  return 0;
+
+ exit_check_input_url:
+  return retval;
 
 }
 
@@ -225,8 +232,8 @@ static int check_output_dir(restful_comm_struct *restful_ptr)
   if ( access(get_config()->output_directory, F_OK ) == -1 ) {
     syslog(LOG_ERR, "= Output directory %s does not exist", get_config()->output_directory);
     pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
-    restful_ptr->cur_classify_info.classify_status = HTTP_400;	
-    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
+    restful_ptr->cur_classify_info.classify_status = CLASSIFY_STATUS_OUTPUT_ERROR;
+    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);
     return -1;	  	
   }
 
@@ -240,7 +247,7 @@ static int check_input_file(restful_comm_struct *restful_ptr)
   if ( access(get_config()->image_url, F_OK ) == -1 ) {
     syslog(LOG_ERR, "= Input file %s does not exist", get_config()->image_url);
     pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
-    restful_ptr->cur_classify_info.classify_status = HTTP_400;	
+    restful_ptr->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
     pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
     return -1;	  	
   }
@@ -380,7 +387,7 @@ static void *restful_classify_thread_func(void *context)
 	{
 	  continue_after_params_parsing = false;
 	  pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
-	  restful->cur_classify_info.classify_status = CLASSIFY_STATUS_ERROR;
+	  restful->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
 	  pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
 	  clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
 	} 
@@ -402,7 +409,7 @@ static void *restful_classify_thread_func(void *context)
 	  {
 	    syslog(LOG_ERR, "= Could not config. curl and pull file, %s:%d", __FILE__, __LINE__);
 	    pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
-	    restful->cur_classify_info.classify_status = CLASSIFY_STATUS_ERROR;
+	    restful->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
 	    pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
 	    clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
 	    continue;
