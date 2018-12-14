@@ -171,7 +171,7 @@ syslog_init(const char *debug_level)
     }
 
   }
-  openlog("audioapp", LOG_PERROR | LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL0);
+  openlog("classifyapp", LOG_PERROR | LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL0);
   syslog(LOG_DEBUG, "= Syslog level set to: %ld\n", syslog_pri);
 
   return 0;
