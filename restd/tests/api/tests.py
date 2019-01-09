@@ -153,7 +153,7 @@ def test_post(service_addr, json_key, json_key_used=False, input_json_val=None):
     else:
         values = json.dumps(input_json_val)
         
-    #print values
+    print "= POST JSON request:", values
     request = Request('http://%s/api/v0/classify' % (service_addr,), data=values, headers=headers)
     retval = 0
     try:
