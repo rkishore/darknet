@@ -27,6 +27,8 @@
 //#include "speech_proc.h"
 #include "common.h"
 
+#include "darknet.h"
+
 static void 
 verify_license()
 {
@@ -69,6 +71,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
       {"dnn-data-file", required_argument, 0, 'e'},
       {"daemon-port", required_argument, 0, 'f'},
       {"data-folder-path", required_argument, 0, 'g'},
+      {"gpu-idx", required_argument, 0, 'i'},
       {"log-level", required_argument, 0, 'L'},
       {"help", no_argument, 0, 'h' },
       {"version", no_argument, 0, 'v' },
@@ -76,7 +79,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
     };
 
     int option_index = 0;
-    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:L:hv", 
+    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:L:hv", 
 			long_options,
                         &option_index);
     int sizeof_char_ptr = sizeof(char *);
@@ -113,6 +116,9 @@ get_info_from_cmdline_args(int *argc, char **argv)
       memset(mod_config()->data_folder_path, 0, LARGE_FIXED_STRING_SIZE);
       memcpy(mod_config()->data_folder_path, optarg, strlen(optarg));      
       break;
+    case 'i':
+      mod_config()->gpu_idx = atoi(optarg);
+      break;
     case 'L' : 
       //      mod_config()->debug_level = optarg;
       memcpy(mod_config()->debug_level, optarg, sizeof_char_ptr);  
@@ -142,7 +148,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
 	  get_config()->detection_threshold,
 	  get_config()->interface_name,
 	  get_config()->data_folder_path);
-  
+
   return;
 }
 
@@ -310,6 +316,12 @@ basic_initialization(int *argc, char **argv, char *identity)
       exit(-1);
     }
 
+  // Set GPU to one selected
+  if (get_config()->gpu_idx >= 0)
+    {
+      syslog(LOG_INFO, "= Setting device to idx %d, %s:%d", get_config()->gpu_idx, __FILE__, __LINE__);
+      cuda_set_device(get_config()->gpu_idx);
+    }
   return;
 }
 
