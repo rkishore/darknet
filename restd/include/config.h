@@ -25,6 +25,8 @@ struct Config
   char           output_directory[LARGE_FIXED_STRING_SIZE];
   char           output_fileprefix[LARGE_FIXED_STRING_SIZE];
   char           input_type[SMALL_FIXED_STRING_SIZE];
+
+  int            gpu_idx;
   
 };
 

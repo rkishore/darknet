@@ -728,6 +728,7 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 
   int cur_classify_status = -1, i = 0;
   cJSON *config_json = NULL, *results_json = NULL, *labels_array_json = NULL, *confidence_array_json = NULL;
+  cJSON *left_array_json = NULL, *right_array_json = NULL, *top_array_json = NULL, *bottom_array_json = NULL;
   // char output_resolution[64];
   // classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
   struct tm *ptm;
@@ -772,7 +773,19 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
       confidence_array_json = cJSON_CreateFloatArray((const float *)restful_ptr->cur_classify_info.results_info.confidence, restful_ptr->cur_classify_info.results_info.num_labels_detected);
       cJSON_AddItemToObject(results_json, "confidence", confidence_array_json);
       cJSON_AddNumberToObject(results_json, "processing_time_in_ms", restful_ptr->cur_classify_info.results_info.processing_time_in_seconds*1000.0);
-            
+
+      left_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.left, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+      cJSON_AddItemToObject(results_json, "left", left_array_json);
+
+      right_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.right, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+      cJSON_AddItemToObject(results_json, "right", right_array_json);
+
+      top_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.top, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+      cJSON_AddItemToObject(results_json, "top", top_array_json);
+
+      bottom_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.bottom, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+      cJSON_AddItemToObject(results_json, "bottom", bottom_array_json);
+      
     } else {
 
       if (cur_classify_status == CLASSIFY_STATUS_STOPPED) {

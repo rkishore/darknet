@@ -17,6 +17,20 @@ struct detection_results {
   float confidence[MAX_DETECTIONS_PER_IMAGE];
 
   float processing_time_in_seconds;
+
+  int top_left_x[MAX_DETECTIONS_PER_IMAGE];
+  int top_left_y[MAX_DETECTIONS_PER_IMAGE];
+  int top_right_x[MAX_DETECTIONS_PER_IMAGE];
+  int top_right_y[MAX_DETECTIONS_PER_IMAGE];
+  int bottom_left_x[MAX_DETECTIONS_PER_IMAGE];
+  int bottom_left_y[MAX_DETECTIONS_PER_IMAGE];
+  int bottom_right_x[MAX_DETECTIONS_PER_IMAGE];
+  int bottom_right_y[MAX_DETECTIONS_PER_IMAGE];
+
+  int left[MAX_DETECTIONS_PER_IMAGE];
+  int right[MAX_DETECTIONS_PER_IMAGE];
+  int top[MAX_DETECTIONS_PER_IMAGE];
+  int bottom[MAX_DETECTIONS_PER_IMAGE];
   
 };
 

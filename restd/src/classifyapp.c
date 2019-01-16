@@ -422,7 +422,7 @@ static void *restful_classify_thread_func(void *context)
       }
 
     syslog(LOG_INFO, "= About to run the detect+classify, %s:%d", __FILE__, __LINE__);
-   
+  
     run_detector_custom(&prep_netinfo_inst,
 			restful->classifyapp_data->appconfig.input_filename,
 			restful->classifyapp_data->appconfig.detection_threshold,
@@ -454,7 +454,18 @@ static void *restful_classify_thread_func(void *context)
 	   restful->cur_classify_info.results_info.num_labels_detected,
 	   restful->cur_classify_info.results_info.processing_time_in_seconds * 1000.0);
     for (i = 0; i<restful->cur_classify_info.results_info.num_labels_detected; i++)
-      syslog(LOG_INFO, "= Label #: %d | name: %s | confidence: %0.2f%%", i, restful->cur_classify_info.results_info.labels[i], restful->cur_classify_info.results_info.confidence[i]);
+      syslog(LOG_INFO, "= Label #: %d | name: %s | confidence: %0.2f%% | tl: (%d,%d), tr: (%d,%d), bl: (%d,%d), br: (%d,%d)",
+	     i,
+	     restful->cur_classify_info.results_info.labels[i],
+	     restful->cur_classify_info.results_info.confidence[i],
+	     restful->cur_classify_info.results_info.top_left_x[i],
+	     restful->cur_classify_info.results_info.top_left_y[i],
+	     restful->cur_classify_info.results_info.top_right_x[i],
+	     restful->cur_classify_info.results_info.top_right_y[i],
+	     restful->cur_classify_info.results_info.bottom_left_x[i],
+	     restful->cur_classify_info.results_info.bottom_left_y[i],
+	     restful->cur_classify_info.results_info.bottom_right_x[i],
+	     restful->cur_classify_info.results_info.bottom_right_y[i]);
     
   }
 
