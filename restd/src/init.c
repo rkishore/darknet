@@ -28,6 +28,7 @@
 #include "common.h"
 
 #include "darknet.h"
+#include "cuda.h"
 
 static void 
 verify_license()
@@ -297,7 +298,7 @@ basic_initialization(int *argc, char **argv, char *identity)
   check_if_key_files_and_paths_exist();
   
   /* Check if license key exists */
-  verify_license();
+  // verify_license();
 
   /* Curl-specific init
      
@@ -320,7 +321,10 @@ basic_initialization(int *argc, char **argv, char *identity)
   if (get_config()->gpu_idx >= 0)
     {
       syslog(LOG_INFO, "= Setting device to idx %d, %s:%d", get_config()->gpu_idx, __FILE__, __LINE__);
+      gpu_index = get_config()->gpu_idx;
       cuda_set_device(get_config()->gpu_idx);
+      // check_error(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
+      syslog(LOG_INFO, "= Getting device idx %d, %s:%d", cuda_get_device(), __FILE__, __LINE__);
     }
   return;
 }

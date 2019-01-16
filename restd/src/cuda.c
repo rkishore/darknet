@@ -91,6 +91,8 @@ float *cuda_make_array(float *x, size_t n)
 {
     float *x_gpu;
     size_t size = sizeof(float)*n;
+    // fprintf(stderr, "= Setting GPU idx to %d, %s:%d\n", gpu_index, __FILE__, __LINE__);
+    cuda_set_device(gpu_index);
     cudaError_t status = cudaMalloc((void **)&x_gpu, size);
     check_error(status);
     if(x){
@@ -134,6 +136,8 @@ int *cuda_make_int_array(int *x, size_t n)
 {
     int *x_gpu;
     size_t size = sizeof(int)*n;
+    // fprintf(stderr, "= Setting GPU idx to %d, %s:%d\n", gpu_index, __FILE__, __LINE__);
+    cuda_set_device(gpu_index);
     cudaError_t status = cudaMalloc((void **)&x_gpu, size);
     check_error(status);
     if(x){

@@ -358,6 +358,7 @@ void set_batch_network(network *net, int b)
 int resize_network(network *net, int w, int h)
 {
 #ifdef GPU
+    // fprintf(stderr, "= Setting GPU to %d, %s:%d\n", net->gpu_index, __FILE__, __LINE__);
     cuda_set_device(net->gpu_index);
     cuda_free(net->workspace);
 #endif
@@ -774,6 +775,7 @@ float *network_output(network *net)
 void forward_network_gpu(network *netp)
 {
     network net = *netp;
+    // fprintf(stderr, "= Setting GPU to %d, %s:%d\n", net.gpu_index, __FILE__, __LINE__);
     cuda_set_device(net.gpu_index);
     cuda_push_array(net.input_gpu, net.input, net.inputs*net.batch);
     if(net.truth){
@@ -804,6 +806,7 @@ void backward_network_gpu(network *netp)
     int i;
     network net = *netp;
     network orig = net;
+    // fprintf(stderr, "= Setting GPU to %d, %s:%d\n", net.gpu_index, __FILE__, __LINE__);
     cuda_set_device(net.gpu_index);
     for(i = net.n-1; i >= 0; --i){
         layer l = net.layers[i];
@@ -825,6 +828,7 @@ void backward_network_gpu(network *netp)
 void update_network_gpu(network *netp)
 {
     network net = *netp;
+    // fprintf(stderr, "= Setting GPU to %d, %s:%d\n", net.gpu_index, __FILE__, __LINE__);
     cuda_set_device(net.gpu_index);
     int i;
     update_args a = {0};
@@ -850,6 +854,7 @@ void update_network_gpu(network *netp)
 void harmless_update_network_gpu(network *netp)
 {
     network net = *netp;
+    // fprintf(stderr, "= Setting GPU to %d, %s:%d\n", net.gpu_index, __FILE__, __LINE__);
     cuda_set_device(net.gpu_index);
     int i;
     for(i = 0; i < net.n; ++i){
@@ -870,6 +875,7 @@ void *train_thread(void *ptr)
 {
     train_args args = *(train_args*)ptr;
     free(ptr);
+    // fprintf(stderr, "= Setting GPU to %d, %s:%d\n", args.net->gpu_index, __FILE__, __LINE__);
     cuda_set_device(args.net->gpu_index);
     *args.err = train_network(args.net, args.d);
     return 0;
@@ -1043,6 +1049,7 @@ void sync_layer(network **nets, int n, int j)
     layer base = net->layers[j];
     scale_weights(base, 0);
     for (i = 0; i < n; ++i) {
+    	// fprintf(stderr, "= Setting GPU to %d, %s:%d\n", nets[i]->gpu_index, __FILE__, __LINE__);
         cuda_set_device(nets[i]->gpu_index);
         layer l = nets[i]->layers[j];
         pull_weights(l);
@@ -1050,6 +1057,7 @@ void sync_layer(network **nets, int n, int j)
     }
     scale_weights(base, 1./n);
     for (i = 0; i < n; ++i) {
+    	// fprintf(stderr, "= Setting GPU to %d, %s:%d\n", nets[i]->gpu_index, __FILE__, __LINE__);
         cuda_set_device(nets[i]->gpu_index);
         layer l = nets[i]->layers[j];
         distribute_weights(l, base);

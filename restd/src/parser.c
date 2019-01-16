@@ -746,6 +746,7 @@ network *parse_network_cfg(char *filename)
     if(!n) error("Config file has no sections");
     network *net = make_network(sections->size - 1);
     net->gpu_index = gpu_index;
+    fprintf(stderr, "= GPU idx: %d,%d, %s:%d\n", gpu_index, net->gpu_index, __FILE__, __LINE__);
     size_params params;
 
     section *s = (section *)n->val;
@@ -1008,6 +1009,7 @@ void save_weights_upto(network *net, char *filename, int cutoff)
 {
 #ifdef GPU
     if(net->gpu_index >= 0){
+    	// fprintf(stderr, "= Setting GPU to %d, %s:%d\n", net->gpu_index, __FILE__, __LINE__);
         cuda_set_device(net->gpu_index);
     }
 #endif
@@ -1219,6 +1221,7 @@ void load_weights_upto(network *net, char *filename, int start, int cutoff)
 {
 #ifdef GPU
     if(net->gpu_index >= 0){
+    	// fprintf(stderr, "= Setting GPU to %d, %s:%d\n", net->gpu_index, __FILE__, __LINE__);
         cuda_set_device(net->gpu_index);
     }
 #endif
