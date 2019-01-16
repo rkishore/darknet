@@ -696,11 +696,13 @@ void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datac
   return;
 }
 
-void get_detections_custom(detection *dets, int num, float thresh, char **names, int classes, struct detection_results *results_info)
+void get_detections_custom(image im, detection *dets, int num, float thresh, char **names, int classes, struct detection_results *results_info)
 {
 
   int i,j, k = 0;
-
+  int left, right, top, bot;
+  box b;
+  
   for(i = 0; i < num; ++i){
     for(j = 0; j < classes; ++j){
       if (dets[i].prob[j] > thresh){
@@ -709,6 +711,32 @@ void get_detections_custom(detection *dets, int num, float thresh, char **names,
 
 	snprintf(&results_info->labels[k][0], MAX_LABEL_STRING_SIZE-1, "%s", names[j]);
 	results_info->confidence[k] = dets[i].prob[j]*100;
+
+	b = dets[i].bbox;
+	left  = (b.x-b.w/2.)*im.w;
+	right = (b.x+b.w/2.)*im.w;
+	top   = (b.y-b.h/2.)*im.h;
+	bot   = (b.y+b.h/2.)*im.h;
+	    
+	if(left < 0) left = 0;
+	if(right > im.w-1) right = im.w-1;
+	if(top < 0) top = 0;
+	if(bot > im.h-1) bot = im.h-1;
+
+	results_info->top_left_x[k] = left;
+	results_info->top_left_y[k] = top;
+	results_info->top_right_x[k] = right;
+	results_info->top_right_y[k] = top;
+	results_info->bottom_left_x[k] = left;
+	results_info->bottom_left_y[k] = bot;
+	results_info->bottom_right_x[k] = right;
+	results_info->bottom_right_y[k] = bot;
+	
+	results_info->left[k] = left;
+	results_info->right[k] = right;
+	results_info->top[k] = top;
+	results_info->bottom[k] = bot;
+
 	k += 1;
 	
       }
@@ -760,7 +788,7 @@ void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename,
         //printf("%d\n", nboxes);
         //if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
-	get_detections_custom(dets, nboxes, thresh, names, l.classes, results_info);
+	get_detections_custom(im, dets, nboxes, thresh, names, l.classes, results_info);
         draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
         free_detections(dets, nboxes);
 	
