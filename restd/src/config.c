@@ -135,10 +135,10 @@ void fill_default_config()
   strcpy(&config->dnn_data_file[0], (const char *)"/usr/local/share/classifyapp/cfg/coco.data");
 
   memset(&config->dnn_config_file[0], 0, LARGE_FIXED_STRING_SIZE);
-  strcpy(&config->dnn_config_file[0], (const char *)"/usr/local/share/classifyapp/cfg/yolov3.cfg");
+  strcpy(&config->dnn_config_file[0], (const char *)"/usr/local/share/classifyapp/cfg/classifyapp_v0.cfg");
 
   memset(&config->dnn_weights_file[0], 0, LARGE_FIXED_STRING_SIZE);
-  strcpy(&config->dnn_weights_file[0], (const char *)"/usr/local/share/classifyapp/cfg/yolov3.weights");
+  strcpy(&config->dnn_weights_file[0], (const char *)"/usr/local/share/classifyapp/cfg/classifyapp_v0.weights");
 
   memset(&config->data_folder_path[0], 0, LARGE_FIXED_STRING_SIZE);
   strcpy(&config->data_folder_path[0], (const char *)"/usr/local/share/classifyapp/data/");
