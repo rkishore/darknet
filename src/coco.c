@@ -373,7 +373,8 @@ void run_coco(int argc, char **argv)
     int cam_index = find_int_arg(argc, argv, "-c", 0);
     int frame_skip = find_int_arg(argc, argv, "-s", 0);
 	int ext_output = find_arg(argc, argv, "-ext_output");
-
+	char *out_json_filename = find_char_arg(argc, argv, "-out_json_filename", 0);
+	
     if(argc < 4){
         fprintf(stderr, "usage: %s %s [train/test/valid] [cfg] [weights (optional)]\n", argv[0], argv[1]);
         return;
@@ -387,5 +388,5 @@ void run_coco(int argc, char **argv)
     else if(0==strcmp(argv[2], "valid")) validate_coco(cfg, weights);
     else if(0==strcmp(argv[2], "recall")) validate_coco_recall(cfg, weights);
     else if(0==strcmp(argv[2], "demo")) demo(cfg, weights, thresh, hier_thresh, cam_index, filename, coco_classes, 80, frame_skip,
-		prefix, out_filename, http_stream_port, dont_show, ext_output);
+					     prefix, out_filename, http_stream_port, dont_show, ext_output, out_json_filename);
 }
