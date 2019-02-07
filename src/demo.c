@@ -97,7 +97,7 @@ void *detect_in_thread(void *ptr)
 
     cJSON *regions_json = NULL, *regions_array_json = NULL, *region_json = NULL;
     char tmp_char_buff[128];
-    int i,j, k = 0, num_labels_detected = 0;
+    int i,j, num_labels_detected = 0;
     int left, right, top, bot;
     box b;
     // FILE *json_ofp = fopen("/tmp/output.json", "w");
@@ -122,8 +122,9 @@ void *detect_in_thread(void *ptr)
     printf("\033[2J");
     printf("\033[1;1H");
     printf("\nFPS:%.1f\n",fps);
+    printf("frame_count: %d\n", local_frame_count + 1);
     printf("Objects:\n\n");
-
+    
     ipl_images[demo_index] = det_img;
     det_img = ipl_images[(demo_index + FRAMES / 2 + 1) % FRAMES];
     demo_index = (demo_index + 1)%FRAMES;
@@ -133,7 +134,10 @@ void *detect_in_thread(void *ptr)
     if (det_img != NULL)
       {
 	memset(tmp_char_buff, 0, 128);
-	sprintf(tmp_char_buff, "%08d.jpg", local_frame_count);
+	if (ptr != NULL)
+	  sprintf(tmp_char_buff, "%s/%08d.jpg", (char *)ptr, local_frame_count);
+	else
+	  sprintf(tmp_char_buff, "%08d.jpg", local_frame_count);
 
 	cJSON_AddItemToObject(per_frame_json, tmp_char_buff, regions_json=cJSON_CreateObject());
 
@@ -274,14 +278,22 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     det_s = in_s;
 
     fetch_in_thread(0);
-    detect_in_thread(0);
+
+    if(filename)
+      detect_in_thread((void *)filename);
+    else
+      detect_in_thread(0);
+    
     det_img = in_img;
     det_s = in_s;
 
     for(j = 0; j < FRAMES/2; ++j){
         fetch_in_thread(0);
-        detect_in_thread(0);
-        det_img = in_img;
+	if(filename)
+	  detect_in_thread((void *)filename);
+	else
+	  detect_in_thread(0);
+	det_img = in_img;
         det_s = in_s;
     }
 
@@ -315,8 +327,15 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         ++local_frame_count;
         if(1){
             if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
-            if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
-
+	    if(filename)
+	      {
+		if(pthread_create(&detect_thread, 0, detect_in_thread, (void *)filename)) error("Thread creation failed");
+	      }
+	    else
+	      {
+		if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
+	      }
+	    
             if(!prefix){
                 if (!dont_show) {
                     show_image_cv_ipl(show_img, "Demo");
