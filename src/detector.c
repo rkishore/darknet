@@ -1260,6 +1260,8 @@ void run_detector(int argc, char **argv)
     // and for recall mode (extended output table-like format with results for best_class fit)
     int ext_output = find_arg(argc, argv, "-ext_output");
     int save_labels = find_arg(argc, argv, "-save_labels");
+    char *out_json_filename = find_char_arg(argc, argv, "-out_json_filename", 0);
+    
     if(argc < 4){
         fprintf(stderr, "usage: %s %s [train/test/valid/demo/map] [data] [cfg] [weights (optional)]\n", argv[0], argv[1]);
         return;
@@ -1311,7 +1313,7 @@ void run_detector(int argc, char **argv)
             if(strlen(filename) > 0)
                 if (filename[strlen(filename) - 1] == 0x0d) filename[strlen(filename) - 1] = 0;
         demo(cfg, weights, thresh, hier_thresh, cam_index, filename, names, classes, frame_skip, prefix, out_filename,
-            http_stream_port, dont_show, ext_output);
+	     http_stream_port, dont_show, ext_output, out_json_filename);
 
         free_list_contents_kvp(options);
         free_list(options);

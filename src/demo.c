@@ -100,8 +100,6 @@ void *detect_in_thread(void *ptr)
     int i,j, num_labels_detected = 0;
     int left, right, top, bot;
     box b;
-    // FILE *json_ofp = fopen("/tmp/output.json", "w");
-
 
     memcpy(predictions[demo_index], prediction, l.outputs*sizeof(float));
     mean_arrays(predictions, FRAMES, l.outputs, avg);
@@ -133,59 +131,62 @@ void *detect_in_thread(void *ptr)
 
     if (det_img != NULL)
       {
-	memset(tmp_char_buff, 0, 128);
-	if (ptr != NULL)
-	  sprintf(tmp_char_buff, "%s/%08d.jpg", (char *)ptr, local_frame_count);
-	else
-	  sprintf(tmp_char_buff, "%08d.jpg", local_frame_count);
-
-	cJSON_AddItemToObject(per_frame_json, tmp_char_buff, regions_json=cJSON_CreateObject());
-
-	for(i = 0; i < nboxes; ++i){
-	  for(j = 0; j < demo_classes; ++j){
-	    if (dets[i].prob[j] > demo_thresh){
-	      num_labels_detected += 1;
-	    }
-	  }
-	}
-
-	if (num_labels_detected > 0)
+	if (per_frame_json != NULL)
 	  {
-	
-	    regions_array_json = cJSON_AddArrayToObject(regions_json, "regions");
-	
+	    memset(tmp_char_buff, 0, 128);
+	    if (ptr != NULL)
+	      sprintf(tmp_char_buff, "%s/%08d.jpg", (char *)ptr, local_frame_count);
+	    else
+	      sprintf(tmp_char_buff, "%08d.jpg", local_frame_count);
+
+	    cJSON_AddItemToObject(per_frame_json, tmp_char_buff, regions_json=cJSON_CreateObject());
+
 	    for(i = 0; i < nboxes; ++i){
 	      for(j = 0; j < demo_classes; ++j){
 		if (dets[i].prob[j] > demo_thresh){
-	      
-		  region_json = cJSON_CreateObject();
-
-		  cJSON_AddStringToObject(region_json, "category", demo_names[j]);
-
-		  b = dets[i].bbox;
-	      
-		  // results_info->confidence[k] = dets[i].prob[j]*100;
-	  	      
-		  left  = (b.x-b.w/2.)*det_img->width;
-		  right = (b.x+b.w/2.)*det_img->width;
-		  top   = (b.y-b.h/2.)*det_img->height;
-		  bot   = (b.y+b.h/2.)*det_img->height;
-	      
-		  if(left < 0) left = 0;
-		  if(right > det_img->width-1) right = det_img->width-1;
-		  if(top < 0) top = 0;
-		  if(bot > det_img->height-1) bot = det_img->height-1;
-
-		  cJSON_AddNumberToObject(region_json, "height", (int)(b.h * det_img->height));
-		  cJSON_AddNumberToObject(region_json, "width", (int)(b.w * det_img->width));
-		  cJSON_AddNumberToObject(region_json, "x", (int)(left));
-		  cJSON_AddNumberToObject(region_json, "y", (int)(top));
-
-		  cJSON_AddItemToArray(regions_array_json, region_json);
-
+		  num_labels_detected += 1;
 		}
 	      }
 	    }
+
+	    if (num_labels_detected > 0)
+	      {
+	
+		regions_array_json = cJSON_AddArrayToObject(regions_json, "regions");
+	
+		for(i = 0; i < nboxes; ++i){
+		  for(j = 0; j < demo_classes; ++j){
+		    if (dets[i].prob[j] > demo_thresh){
+	      
+		      region_json = cJSON_CreateObject();
+
+		      cJSON_AddStringToObject(region_json, "category", demo_names[j]);
+
+		      b = dets[i].bbox;
+	      
+		      // results_info->confidence[k] = dets[i].prob[j]*100;
+	  	      
+		      left  = (b.x-b.w/2.)*det_img->width;
+		      right = (b.x+b.w/2.)*det_img->width;
+		      top   = (b.y-b.h/2.)*det_img->height;
+		      bot   = (b.y+b.h/2.)*det_img->height;
+	      
+		      if(left < 0) left = 0;
+		      if(right > det_img->width-1) right = det_img->width-1;
+		      if(top < 0) top = 0;
+		      if(bot > det_img->height-1) bot = det_img->height-1;
+
+		      cJSON_AddNumberToObject(region_json, "height", (int)(b.h * det_img->height));
+		      cJSON_AddNumberToObject(region_json, "width", (int)(b.w * det_img->width));
+		      cJSON_AddNumberToObject(region_json, "x", (int)(left));
+		      cJSON_AddNumberToObject(region_json, "y", (int)(top));
+
+		      cJSON_AddItemToArray(regions_array_json, region_json);
+
+		    }
+		  }
+		}
+	      }
 	  }
       }
     
@@ -204,7 +205,7 @@ double get_wall_time()
 }
 
 void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
-    int frame_skip, char *prefix, char *out_filename, int http_stream_port, int dont_show, int ext_output)
+	  int frame_skip, char *prefix, char *out_filename, int http_stream_port, int dont_show, int ext_output, const char *json_filename)
 {
     //skip = frame_skip;
     image **alphabet = load_alphabet();
@@ -266,7 +267,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         exit(0);
     }
 
-    per_frame_json = cJSON_CreateObject();
+    if (json_filename)
+      per_frame_json = cJSON_CreateObject();
 
     flag_exit = 0;
 
@@ -414,15 +416,18 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         printf("output_video_writer closed. \n");
     }
 
-    char *full_json_string = cJSON_Print(per_frame_json);
-    if (full_json_string == NULL) {
-      fprintf(stderr, "Failed to print per_frame_json.\n");
-    } else {
-      FILE *json_ofp = fopen("/tmp/output.json", "w");
-      fwrite(full_json_string, sizeof(char), strlen(full_json_string), json_ofp);
-      fclose(json_ofp);
-    }
-    
+    if (json_filename)
+      {
+	char *full_json_string = cJSON_Print(per_frame_json);
+	if (full_json_string == NULL) {
+	  fprintf(stderr, "Failed to print per_frame_json.\n");
+	} else {
+	  FILE *json_ofp = fopen(json_filename, "w");
+	  fwrite(full_json_string, sizeof(char), strlen(full_json_string), json_ofp);
+	  fclose(json_ofp);
+	}
+	cJSON_Delete(per_frame_json);
+      }
     
     // free memory
     cvReleaseImage(&show_img);
@@ -453,7 +458,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 }
 #else
 void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
-    int frame_skip, char *prefix, char *out_filename, int http_stream_port, int dont_show, int ext_output)
+	  int frame_skip, char *prefix, char *out_filename, int http_stream_port, int dont_show, int ext_output, char *json_filename)
 {
     fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
 }
