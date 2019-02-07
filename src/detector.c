@@ -34,6 +34,7 @@ void draw_train_loss(IplImage* img, int img_size, float avg_loss, float max_img_
 #include "http_stream.h"
 
 // To make DEBUG=1 compile without errors about cvRound
+// https://stackoverflow.com/questions/42918747/yolo-c-compilation-failure-with-debug-1
 #include "math.h"
 int cvRound(double value) {return(ceil(value));}
 
