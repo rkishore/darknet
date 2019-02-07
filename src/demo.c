@@ -25,6 +25,10 @@
 #include "opencv2/videoio/videoio_c.h"
 #endif
 #include "http_stream.h"
+
+// For JSON output
+#include "cJSON.h"
+
 image get_image_from_stream(CvCapture *cap);
 
 static char **demo_names;
@@ -60,6 +64,9 @@ IplImage* show_img;
 
 static int flag_exit;
 static int letter_box = 0;
+static int local_frame_count = 0;
+
+cJSON *per_frame_json = NULL;
 
 void *fetch_in_thread(void *ptr)
 {
@@ -83,10 +90,18 @@ void *fetch_in_thread(void *ptr)
 void *detect_in_thread(void *ptr)
 {
     float nms = .45;    // 0.4F
-
+    
     layer l = net.layers[net.n-1];
     float *X = det_s.data;
     float *prediction = network_predict(net, X);
+
+    cJSON *regions_json = NULL, *regions_array_json = NULL, *region_json = NULL;
+    char tmp_char_buff[128];
+    int i,j, k = 0, num_labels_detected = 0;
+    int left, right, top, bot;
+    box b;
+    // FILE *json_ofp = fopen("/tmp/output.json", "w");
+
 
     memcpy(predictions[demo_index], prediction, l.outputs*sizeof(float));
     mean_arrays(predictions, FRAMES, l.outputs, avg);
@@ -114,6 +129,62 @@ void *detect_in_thread(void *ptr)
     demo_index = (demo_index + 1)%FRAMES;
 
     draw_detections_cv_v3(det_img, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+
+    if (det_img != NULL)
+      {
+	memset(tmp_char_buff, 0, 128);
+	sprintf(tmp_char_buff, "%08d.jpg", local_frame_count);
+
+	cJSON_AddItemToObject(per_frame_json, tmp_char_buff, regions_json=cJSON_CreateObject());
+
+	for(i = 0; i < nboxes; ++i){
+	  for(j = 0; j < demo_classes; ++j){
+	    if (dets[i].prob[j] > demo_thresh){
+	      num_labels_detected += 1;
+	    }
+	  }
+	}
+
+	if (num_labels_detected > 0)
+	  {
+	
+	    regions_array_json = cJSON_AddArrayToObject(regions_json, "regions");
+	
+	    for(i = 0; i < nboxes; ++i){
+	      for(j = 0; j < demo_classes; ++j){
+		if (dets[i].prob[j] > demo_thresh){
+	      
+		  region_json = cJSON_CreateObject();
+
+		  cJSON_AddStringToObject(region_json, "category", demo_names[j]);
+
+		  b = dets[i].bbox;
+	      
+		  // results_info->confidence[k] = dets[i].prob[j]*100;
+	  	      
+		  left  = (b.x-b.w/2.)*det_img->width;
+		  right = (b.x+b.w/2.)*det_img->width;
+		  top   = (b.y-b.h/2.)*det_img->height;
+		  bot   = (b.y+b.h/2.)*det_img->height;
+	      
+		  if(left < 0) left = 0;
+		  if(right > det_img->width-1) right = det_img->width-1;
+		  if(top < 0) top = 0;
+		  if(bot > det_img->height-1) bot = det_img->height-1;
+
+		  cJSON_AddNumberToObject(region_json, "height", (int)(b.h * det_img->height));
+		  cJSON_AddNumberToObject(region_json, "width", (int)(b.w * det_img->width));
+		  cJSON_AddNumberToObject(region_json, "x", (int)(left));
+		  cJSON_AddNumberToObject(region_json, "y", (int)(top));
+
+		  cJSON_AddItemToArray(regions_array_json, region_json);
+
+		}
+	      }
+	    }
+	  }
+      }
+    
     free_detections(dets, nboxes);
 
     return 0;
@@ -191,6 +262,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         exit(0);
     }
 
+    per_frame_json = cJSON_CreateObject();
 
     flag_exit = 0;
 
@@ -213,7 +285,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         det_s = in_s;
     }
 
-    int count = 0;
     if(!prefix && !dont_show){
         cvNamedWindow("Demo", CV_WINDOW_NORMAL);
         cvMoveWindow("Demo", 0, 0);
@@ -241,7 +312,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     double before = get_wall_time();
 
     while(1){
-        ++count;
+        ++local_frame_count;
         if(1){
             if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
             if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
@@ -263,7 +334,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                 }
             }else{
                 char buff[256];
-                sprintf(buff, "%s_%08d.jpg", prefix, count);
+                sprintf(buff, "%s_%08d.jpg", prefix, local_frame_count);
                 cvSaveImage(buff, show_img, 0);
                 //save_image(disp, buff);
             }
@@ -324,6 +395,16 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         printf("output_video_writer closed. \n");
     }
 
+    char *full_json_string = cJSON_Print(per_frame_json);
+    if (full_json_string == NULL) {
+      fprintf(stderr, "Failed to print per_frame_json.\n");
+    } else {
+      FILE *json_ofp = fopen("/tmp/output.json", "w");
+      fwrite(full_json_string, sizeof(char), strlen(full_json_string), json_ofp);
+      fclose(json_ofp);
+    }
+    
+    
     // free memory
     cvReleaseImage(&show_img);
     cvReleaseImage(&in_img);
