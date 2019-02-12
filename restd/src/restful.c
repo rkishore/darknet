@@ -363,6 +363,7 @@ static int store_input_loc(cJSON **input_file_loc, classifyapp_struct *classifya
 
 }
 
+
 static int store_input_type(cJSON **input_type, classifyapp_struct *classifyapp_data, int8_t *response_http_code) 
 {
 
@@ -395,6 +396,52 @@ static int store_input_type(cJSON **input_type, classifyapp_struct *classifyapp_
 
     char *cur_err = NULL;
     if (asprintf(&cur_err, "No input type data in incoming request") < 0)
+      syslog(LOG_ERR, "Out of memory? line:%d, %s", __LINE__, __FILE__);
+    else {
+      syslog(LOG_ERR, "= %s", cur_err);
+      free_mem(cur_err);
+    }
+    *response_http_code = HTTP_400;	
+
+    return -1;	  	
+            
+  }
+
+  return 0;
+
+}
+
+static int store_input_mode(cJSON **input_mode, classifyapp_struct *classifyapp_data, int8_t *response_http_code) 
+{
+
+  cJSON *input_mode_data = *input_mode;
+
+  if (input_mode_data) {
+
+    uint8_t is_expected_input_mode = (!strcmp(input_mode_data->valuestring, "image")) || (!strcmp(input_mode_data->valuestring, "video"));
+    
+    if (!is_expected_input_mode) {
+      
+      char *cur_err = NULL;
+      if (asprintf(&cur_err, "Unexpected input_mode: %s (valid values are 'file' or 'stream')", input_mode_data->valuestring) < 0)
+	syslog(LOG_ERR, "Out of memory? line:%d, %s", __LINE__, __FILE__);
+      else {
+	syslog(LOG_ERR, "= %s", cur_err);
+	free_mem(cur_err);
+      }
+      *response_http_code = HTTP_400;	
+      return -1;
+
+    } else {
+      snprintf(classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", input_mode_data->valuestring);
+      //fprintf(stderr, "input_mode: %s\n", classifyapp_data->appconfig.input_mode);
+      //syslog(LOG_INFO,"= input_mode: %s\n", classifyapp_data->appconfig.input_mode);
+    }
+
+  } else {
+
+    char *cur_err = NULL;
+    if (asprintf(&cur_err, "No input mode data in incoming request") < 0)
       syslog(LOG_ERR, "Out of memory? line:%d, %s", __LINE__, __FILE__);
     else {
       syslog(LOG_ERR, "= %s", cur_err);
@@ -483,6 +530,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 {
   // char *out = NULL;
   cJSON *input_data = NULL, *output_dir = NULL, *config_data = NULL, *output_fileprefix = NULL, *input_type_data = NULL;
+  cJSON *input_mode = NULL;
   classifyapp_struct *cur_classifyapp_data = restful->classifyapp_data;
   int cur_classify_thread_status = -1;
 
@@ -496,6 +544,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     //fprintf(stderr,"decoding data:%s\n", lineptr);
     input_data = cJSON_GetObjectItem(*parsedjson, "input");
     input_type_data = cJSON_GetObjectItem(*parsedjson, "type");
+    input_mode = cJSON_GetObjectItem(*parsedjson, "mode");
     output_dir = cJSON_GetObjectItem(*parsedjson, "output_dir");
     output_fileprefix = cJSON_GetObjectItem(*parsedjson, "output_fileprefix");
     config_data = cJSON_GetObjectItem(*parsedjson, "config");
@@ -518,8 +567,16 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     if (store_config_info(&config_data, cur_classifyapp_data, return_http_flag) < 0) 
       return -1;    
 
-    *return_http_flag = HTTP_201;
+    if (input_mode == NULL)
+      memset(cur_classifyapp_data->appconfig.input_mode, 0, SMALL_FIXED_STRING_SIZE-1);
+    else
+      {
+	if (store_input_mode(&input_mode, cur_classifyapp_data, return_http_flag) < 0)
+	  return -1;
+      }
     
+    *return_http_flag = HTTP_201;
+	
     pthread_mutex_lock(&restful->thread_status_lock);
     restful->classify_thread_status = CLASSIFY_THREAD_STATUS_BUSY;
     pthread_mutex_unlock(&restful->thread_status_lock);	      
@@ -528,9 +585,10 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     restful->cur_classify_info.classify_status = CLASSIFY_STATUS_RUNNING;
     clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.start_timestamp);
 
-    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV | image_url: %s (%s) | output_directory: %s | output_fileprefix: %s\n", 
+    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV | input_url: %s (%s) | mode: %s | output_directory: %s | output_fileprefix: %s\n", 
 	   cur_classifyapp_data->appconfig.input_url,
 	   cur_classifyapp_data->appconfig.input_type,
+	   (input_mode == NULL) ? "unspecified" : cur_classifyapp_data->appconfig.input_mode,
 	   cur_classifyapp_data->appconfig.output_directory,
 	   cur_classifyapp_data->appconfig.output_fileprefix);
     
@@ -546,36 +604,6 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
   return 0;
 }
 
-/*
-static void parse_and_handle_post_request(uint32_t **input_request_data, cJSON **parsed_json, 
-					  int8_t *return_http_flag, restful_comm_struct *restful_ptr)
-{
-  char *lineptr = strstr((const char *)*input_request_data, "\r\n\r\n");
-  if (!lineptr) {      
-    lineptr = strstr((const char *)*input_request_data,"\n\n");
-    if (lineptr) {
-      lineptr += 2;		    
-    }
-  } else {		 
-    lineptr += 4;		    
-  }
-		
-  fprintf(stderr,"lineptr: %s\n", lineptr);
-		
-  if (lineptr) {
-    *parsed_json = cJSON_Parse(lineptr);
-    if (!*parsed_json) {
-      fprintf(stderr,"unable to parse msg\n");
-      *return_http_flag = HTTP_400; // Bad Request
-    } else {
-      handle_post_request(parsed_json, return_http_flag, restful_ptr);
-    }
-  }
-
-  return;
-}
-*/
-
 static void copy_to_global_config(restful_comm_struct *restful_ptr)
 {
   classifyapp_struct *classifyapp_info = restful_ptr->classifyapp_data;
@@ -585,6 +613,10 @@ static void copy_to_global_config(restful_comm_struct *restful_ptr)
 
   memset(mod_config()->input_type, 0, SMALL_FIXED_STRING_SIZE);
   memcpy(mod_config()->input_type, classifyapp_info->appconfig.input_type, strlen(classifyapp_info->appconfig.input_type));
+
+  memset(mod_config()->input_mode, 0, SMALL_FIXED_STRING_SIZE);
+  if (strlen(classifyapp_info->appconfig.input_mode) > 0)
+    memcpy(mod_config()->input_mode, classifyapp_info->appconfig.input_mode, strlen(classifyapp_info->appconfig.input_mode));
 
   memset(mod_config()->output_directory, 0, LARGE_FIXED_STRING_SIZE);
   memcpy(mod_config()->output_directory, classifyapp_info->appconfig.output_directory, strlen(classifyapp_info->appconfig.output_directory));

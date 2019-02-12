@@ -171,12 +171,61 @@ static int start_classifyapp_config(restful_comm_struct *restful_data)
 }
 */
 
+static int check_file_type(char *filepath, char *filetype_to_check)
+{
+  char *filecmd = NULL;
+  int typecheck = -1;
+  
+  if (asprintf(&filecmd, "/usr/bin/file %s | grep %s", filepath, filetype_to_check) < 0)
+    {
+      syslog(LOG_ERR, "= Could not asprintf filecmd, %s:%d", __FILE__, __LINE__);
+      return -1;
+    }
+  
+  typecheck = system(filecmd);  
+  
+  free(filecmd);
+  filecmd = NULL;
+
+  return typecheck;
+  
+}
+
+static int fill_input_mode_based_on_file_type(classifyapp_struct *classifyapp_data, char *filename_to_check)
+{
+  int retval = 0, typecheck = -1;
+  
+  // Check file type
+  typecheck = check_file_type(filename_to_check, "image");
+  if (typecheck < 0)
+    retval = -1;
+  else if (typecheck == 0)
+    snprintf(classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "image");
+  else
+    {
+      typecheck = check_file_type(filename_to_check, "Media");
+      if (typecheck < 0)
+	retval = -1;
+      else if (typecheck == 0)
+	snprintf(classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "video");
+      else
+	{
+	  syslog(LOG_ERR, "= Could not find input mode, %s:%d", __FILE__, __LINE__);
+	  retval = -1;
+	}
+    }   
+
+  return retval;
+  
+}
+
 static int check_input_url(restful_comm_struct *restful_ptr) 
 {
 
-  int txtcheck = -1, retval = 0;
-  char *samplefilename = NULL, *filecmd = NULL;
-  
+  int typecheck = -1, retval = 0;
+  char *samplefilename = NULL;
+  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
+      
   if (config_curl_and_pull_file_sample(restful_ptr->classifyapp_data) < 0)
     {
       syslog(LOG_ERR, "= Could not check file for file type from input_url, %s:%d", __FILE__, __LINE__);
@@ -191,35 +240,61 @@ static int check_input_url(restful_comm_struct *restful_ptr)
       goto exit_check_input_url;
     }
   
-  if (asprintf(&filecmd, "/usr/bin/file %s | grep text", samplefilename) < 0)
+  // Check if this is a text file to reject it
+  typecheck = check_file_type(samplefilename, "text");
+  if (typecheck <= 0) // if its an error (typecheck = -1) or a text file (typecheck = 0)
     {
-      syslog(LOG_ERR, "= Could not asprintf filecmd, %s:%d", __FILE__, __LINE__);
+
       free(samplefilename);
       samplefilename = NULL;
+      
       retval = -1;
       goto exit_check_input_url;
+      
     }
 
-  txtcheck = system(filecmd);  
+  if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
+    {
+
+      if (fill_input_mode_based_on_file_type(cur_classifyapp_data, samplefilename) < 0)
+	{
+
+	  free(samplefilename);
+	  samplefilename = NULL;
+	  
+	  retval = -1;
+	  goto exit_check_input_url;
+	  
+	}
+
+      syslog(LOG_INFO, "= INPUT MODE: %s, %s:%d", cur_classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
+      
+    }
 
   free(samplefilename);
   samplefilename = NULL;
-  
-  free(filecmd);
-  filecmd = NULL;
-  
-  if (!txtcheck)
+    
+  if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
     {
-      retval = -1;
-      goto exit_check_input_url;
+      
+      if ( !( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) ) )
+	{
+	  syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+	  retval = -1;
+	}
+      
+    }
+  else if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "video"))
+    {
+      
+      if ( !( (ends_with("mp4", get_config()->image_url) == true) || (ends_with("ts", get_config()->image_url) == true) ) )
+	{
+	  syslog(LOG_ERR, "= Cannot support URLs that don't end in .ts or .mp4 yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+	  retval = -1;
+	}
+      
     }
   
-  if ( !( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) ) )
-    {
-      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
-      retval = -1;
-    }
-
  exit_check_input_url:
   return retval;
 
@@ -243,7 +318,9 @@ static int check_output_dir(restful_comm_struct *restful_ptr)
 static int check_input_file(restful_comm_struct *restful_ptr) 
 {
 
-  // Check if directory exists 
+  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
+    
+  // Check if input file exists 
   if ( access(get_config()->image_url, F_OK ) == -1 ) {
     syslog(LOG_ERR, "= Input file %s does not exist", get_config()->image_url);
     pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
@@ -252,7 +329,26 @@ static int check_input_file(restful_comm_struct *restful_ptr)
     return -1;	  	
   }
 
+  if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
+    {
+      
+      if (fill_input_mode_based_on_file_type(cur_classifyapp_data, (char *)get_config()->image_url) < 0)
+	{
+
+	  syslog(LOG_ERR, "= Input's %s mode could not be determined, %s: %d", get_config()->image_url, __FILE__, __LINE__);
+	  pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
+	  restful_ptr->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
+	  pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
+	  return -1;
+	  
+	}
+
+      syslog(LOG_INFO, "= INPUT MODE: %s, %s:%d", cur_classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
+      
+    }  
+  
   return 0;
+  
 }
 
 /*
@@ -370,7 +466,7 @@ static void *restful_classify_thread_func(void *context)
       free(dispatch_msg);
       dispatch_msg = NULL;
       
-      syslog(LOG_INFO, "= RCVD DISPATCH_MSG | image_url: %s | output_directory: %s | output_fileprefix: %s\n",
+      syslog(LOG_INFO, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_fileprefix: %s",
 	     classifyapp_info->appconfig.input_url, 
 	     classifyapp_info->appconfig.output_directory,
 	     classifyapp_info->appconfig.output_fileprefix);
@@ -421,52 +517,72 @@ static void *restful_classify_thread_func(void *context)
 	snprintf(restful->classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "%s", get_config()->image_url);
       }
 
-    syslog(LOG_INFO, "= About to run the detect+classify, %s:%d", __FILE__, __LINE__);
+    if (!strcmp(restful->classifyapp_data->appconfig.input_mode, "image"))
+      {
+	syslog(LOG_INFO, "= About to run the detect+classify for %s: %s, %s:%d", restful->classifyapp_data->appconfig.input_mode,
+	       restful->classifyapp_data->appconfig.input_filename,
+	       __FILE__, __LINE__);
   
-    run_detector_custom(&prep_netinfo_inst,
-			restful->classifyapp_data->appconfig.input_filename,
-			restful->classifyapp_data->appconfig.detection_threshold,
-			.5,
-			"/tmp/predictions.png",
-			0,
-			&restful->cur_classify_info.results_info);
+	run_detector_custom(&prep_netinfo_inst,
+			    restful->classifyapp_data->appconfig.input_filename,
+			    restful->classifyapp_data->appconfig.detection_threshold,
+			    .5,
+			    "/tmp/predictions.png",
+			    0,
+			    &restful->cur_classify_info.results_info);
+	
+	syslog(LOG_INFO, "= Done with detect+classify, %s:%d", __FILE__, __LINE__);
+	
+	/* 
+	   test_detector("/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
+	   "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
+	   "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
+	   restful->classifyapp_data->appconfig.input_filename,
+	   0.5,
+	   .5,
+	   "/tmp/predictions.png",
+	   0);
+	*/
+	
+	syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
+	clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
+	pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
+	restful->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
+	pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
+	
+	syslog(LOG_INFO, "= Num. labels detected: %d in time: %0.2f milliseconds",
+	       restful->cur_classify_info.results_info.num_labels_detected,
+	       restful->cur_classify_info.results_info.processing_time_in_seconds * 1000.0);
+	for (i = 0; i<restful->cur_classify_info.results_info.num_labels_detected; i++)
+	  syslog(LOG_INFO, "= Label #: %d | name: %s | confidence: %0.2f%% | tl: (%d,%d), tr: (%d,%d), bl: (%d,%d), br: (%d,%d)",
+		 i,
+		 restful->cur_classify_info.results_info.labels[i],
+		 restful->cur_classify_info.results_info.confidence[i],
+		 restful->cur_classify_info.results_info.top_left_x[i],
+		 restful->cur_classify_info.results_info.top_left_y[i],
+		 restful->cur_classify_info.results_info.top_right_x[i],
+		 restful->cur_classify_info.results_info.top_right_y[i],
+		 restful->cur_classify_info.results_info.bottom_left_x[i],
+		 restful->cur_classify_info.results_info.bottom_left_y[i],
+		 restful->cur_classify_info.results_info.bottom_right_x[i],
+		 restful->cur_classify_info.results_info.bottom_right_y[i]);
+	
+      }
+    else
+      {
 
-    syslog(LOG_INFO, "= Done with detect+classify, %s:%d", __FILE__, __LINE__);
-    
-    /* 
-    test_detector("/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
-		  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
-		  "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
-		  restful->classifyapp_data->appconfig.input_filename,
-		  0.5,
-		  .5,
-		  "/tmp/predictions.png",
-		  0);
-    */
-    
-    syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
-    clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
-    pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
-    restful->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
-    pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
+	syslog(LOG_INFO, "= Detect+classify for %s: %s IN-THE-WORKS, %s:%d",
+	       restful->classifyapp_data->appconfig.input_mode,
+	       restful->classifyapp_data->appconfig.input_filename,
+	       __FILE__, __LINE__);
 
-    syslog(LOG_INFO, "= Num. labels detected: %d in time: %0.2f milliseconds",
-	   restful->cur_classify_info.results_info.num_labels_detected,
-	   restful->cur_classify_info.results_info.processing_time_in_seconds * 1000.0);
-    for (i = 0; i<restful->cur_classify_info.results_info.num_labels_detected; i++)
-      syslog(LOG_INFO, "= Label #: %d | name: %s | confidence: %0.2f%% | tl: (%d,%d), tr: (%d,%d), bl: (%d,%d), br: (%d,%d)",
-	     i,
-	     restful->cur_classify_info.results_info.labels[i],
-	     restful->cur_classify_info.results_info.confidence[i],
-	     restful->cur_classify_info.results_info.top_left_x[i],
-	     restful->cur_classify_info.results_info.top_left_y[i],
-	     restful->cur_classify_info.results_info.top_right_x[i],
-	     restful->cur_classify_info.results_info.top_right_y[i],
-	     restful->cur_classify_info.results_info.bottom_left_x[i],
-	     restful->cur_classify_info.results_info.bottom_left_y[i],
-	     restful->cur_classify_info.results_info.bottom_right_x[i],
-	     restful->cur_classify_info.results_info.bottom_right_y[i]);
-    
+	syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
+	clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
+	pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
+	restful->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
+	pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
+	
+      }
   }
 
   syslog(LOG_INFO, "= About to leave restful_classify_thread, line:%d, %s", __LINE__, __FILE__);
