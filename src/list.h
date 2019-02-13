@@ -1,6 +1,8 @@
 #ifndef LIST_H
 #define LIST_H
 
+#include <stdbool.h>
+
 typedef struct node{
     void *val;
     struct node *next;
@@ -21,7 +23,7 @@ void list_insert(list *, void *);
 void **list_to_array(list *l);
 
 void free_list(list *l);
-void free_list_contents(list *l);
+void free_list_contents(list *l, bool end_flag);
 void free_list_contents_kvp(list *l);
 
 #endif

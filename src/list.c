@@ -71,10 +71,16 @@ void free_list(list *l)
     free(l);
 }
 
-void free_list_contents(list *l)
+void free_list_contents(list *l, bool end_flag)
 {
     node *n = l->front;
     while(n){
+        if (end_flag == true)
+	  {
+	    kvp *p = (kvp *)n->val;
+	    free(p->key);
+	    p->key = NULL;
+	  }
         free(n->val);
         n = n->next;
     }
@@ -85,7 +91,7 @@ void free_list_contents_kvp(list *l)
     node *n = l->front;
     while (n) {
         kvp *p = n->val;
-        free(p->key);
+        if (p->key) free(p->key);
         free(n->val);
         n = n->next;
     }

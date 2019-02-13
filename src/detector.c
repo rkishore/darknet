@@ -6,6 +6,9 @@
 #include "box.h"
 #include "demo.h"
 #include "option_list.h"
+#include "darknet.h"
+#include "restful.h"
+#include "config.h"
 
 #ifdef OPENCV
 #include "opencv2/highgui/highgui_c.h"
@@ -244,7 +247,7 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 
     free(base);
     free(paths);
-    free_list_contents(plist);
+    free_list_contents(plist, true);
     free_list(plist);
 
     free_list_contents_kvp(options);
@@ -1238,6 +1241,72 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 
     free_network(net);
 }
+
+#ifdef CLASSIFYAPP
+void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datacfg, char *cfgfile, char *weightfile)
+{
+  
+  char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+  memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+  snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+
+  prep_netinfo->options = read_data_cfg(datacfg);
+  prep_netinfo->name_list = option_find_str(prep_netinfo->options, "names", names_file_path);
+  prep_netinfo->names = get_labels_custom(prep_netinfo->name_list, &prep_netinfo->names_array_len); 
+  prep_netinfo->alphabet = load_alphabet();
+  prep_netinfo->net = load_network(cfgfile, weightfile, 0);
+  prep_netinfo->classes = option_find_int(prep_netinfo->options, "classes", 20);
+  
+  set_batch_network(prep_netinfo->net, 1);
+
+  return;
+}
+
+void get_detections_custom(image im, detection *dets, int num, float thresh, char **names, int classes, struct detection_results *results_info)
+{
+  return;
+}
+
+void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen, struct detection_results *results_info)
+{
+  return;
+}
+
+void run_detector_custom_video(struct prep_network_info *prep_netinfo,
+			       char *filename,
+			       float thresh,
+			       float hier_thresh,
+			       char *outfile_img_prefix)
+{
+  return;
+}
+
+void free_detector_internal_datastructures(struct prep_network_info *prep_netinfo)
+{
+
+  int i = 0, j = 0, nsize=8;
+  network *curnet = prep_netinfo->net;
+  
+  free_list_contents(prep_netinfo->options, true);
+  free_list(prep_netinfo->options);
+  
+  for(j = 0; j < nsize; ++j)
+    {
+      for(i = 32; i < 127; ++i) 
+	free_image(prep_netinfo->alphabet[j][i]);
+      free(prep_netinfo->alphabet[j]);
+    }
+
+  free(prep_netinfo->alphabet);
+  for (i = 0; i < prep_netinfo->names_array_len; i++)
+    free(prep_netinfo->names[i]);
+  free(prep_netinfo->names);
+  free_network(*curnet);
+  free(curnet);
+  
+  return;
+}
+#endif
 
 void run_detector(int argc, char **argv)
 {
