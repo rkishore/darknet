@@ -613,7 +613,7 @@ struct prep_network_info {
   char **names;
   
   image **alphabet;
-  network *net;
+  network net;
   int classes;
 };
 

@@ -485,7 +485,7 @@ void validate_detector_recall(char *datacfg, char *cfgfile, char *weightfile)
     list *plist = get_paths(valid_images);
     char **paths = (char **)list_to_array(plist);
 
-    layer l = net.layers[net.n - 1];
+    // layer l = net.layers[net.n - 1];
 
     int j, k;
 
@@ -566,7 +566,7 @@ int detections_comparator(const void *pa, const void *pb)
 
 void validate_detector_map(char *datacfg, char *cfgfile, char *weightfile, float thresh_calc_avg_iou, const float iou_thresh)
 {
-    int j;
+  //int j;
     list *options = read_data_cfg(datacfg);
     char *valid_images = option_find_str(options, "valid", "data/train.txt");
     char *difficult_valid_images = option_find_str(options, "difficult", NULL);
@@ -1045,7 +1045,7 @@ void calc_anchors(char *datacfg, int num_of_clusters, int width, int height, int
         float iou = box_intersect / box_union;
         if (iou > 1 || iou < 0) { // || box_w > width || box_h > height) {
             printf(" Wrong label: i = %d, box_w = %d, box_h = %d, anchor_w = %d, anchor_h = %d, iou = %f \n",
-                i, box_w, box_h, anchor_w, anchor_h, iou);
+		   i, (int)box_w, (int)box_h, (int)anchor_w, (int)anchor_h, iou);
         }
         else avg_iou += iou;
     }
@@ -1225,7 +1225,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     }
 
     // free memory
-    free_ptrs(names, net.layers[net.n - 1].classes);
+    free_ptrs((void **)names, net.layers[net.n - 1].classes);
     free_list_contents_kvp(options);
     free_list(options);
 
@@ -1254,21 +1254,130 @@ void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datac
   prep_netinfo->name_list = option_find_str(prep_netinfo->options, "names", names_file_path);
   prep_netinfo->names = get_labels_custom(prep_netinfo->name_list, &prep_netinfo->names_array_len); 
   prep_netinfo->alphabet = load_alphabet();
-  prep_netinfo->net = load_network(cfgfile, weightfile, 0);
+  // prep_netinfo->net = load_network(cfgfile, weightfile, 0);
+  prep_netinfo->net = parse_network_cfg_custom(cfgfile, 1);
+  if (weightfile)
+    load_weights(&prep_netinfo->net, weightfile);
+
+  fuse_conv_batchnorm(prep_netinfo->net);
+  calculate_binary_weights(prep_netinfo->net);
+
   prep_netinfo->classes = option_find_int(prep_netinfo->options, "classes", 20);
   
-  set_batch_network(prep_netinfo->net, 1);
+  //set_batch_network(prep_netinfo->net, 1);
 
   return;
 }
 
 void get_detections_custom(image im, detection *dets, int num, float thresh, char **names, int classes, struct detection_results *results_info)
 {
+
+  int i,j, k = 0;
+  int left, right, top, bot;
+  box b;
+  
+  for(i = 0; i < num; ++i){
+    for(j = 0; j < classes; ++j){
+      if (dets[i].prob[j] > thresh){
+
+	// printf("%s: %.0f%%\n", names[j], dets[i].prob[j]*100);
+
+	snprintf(&results_info->labels[k][0], MAX_LABEL_STRING_SIZE-1, "%s", names[j]);
+	results_info->confidence[k] = dets[i].prob[j]*100;
+
+	b = dets[i].bbox;
+	left  = (b.x-b.w/2.)*im.w;
+	right = (b.x+b.w/2.)*im.w;
+	top   = (b.y-b.h/2.)*im.h;
+	bot   = (b.y+b.h/2.)*im.h;
+	    
+	if(left < 0) left = 0;
+	if(right > im.w-1) right = im.w-1;
+	if(top < 0) top = 0;
+	if(bot > im.h-1) bot = im.h-1;
+
+	results_info->top_left_x[k] = left;
+	results_info->top_left_y[k] = top;
+	results_info->top_right_x[k] = right;
+	results_info->top_right_y[k] = top;
+	results_info->bottom_left_x[k] = left;
+	results_info->bottom_left_y[k] = bot;
+	results_info->bottom_right_x[k] = right;
+	results_info->bottom_right_y[k] = bot;
+	
+	results_info->left[k] = left;
+	results_info->right[k] = right;
+	results_info->top[k] = top;
+	results_info->bottom[k] = bot;
+
+	k += 1;
+	
+      }
+    }
+  }
+
+  results_info->num_labels_detected = k;
+
   return;
 }
 
-void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen, struct detection_results *results_info)
+void run_detector_custom(struct prep_network_info *prep_netinfo,
+			 char *filename,
+			 float thresh,
+			 float hier_thresh,
+			 char *outfile,
+			 int fullscreen,
+			 struct detection_results *results_info)
 {
+  char **names = prep_netinfo->names;
+  image **alphabet = prep_netinfo->alphabet;
+  
+  network net = prep_netinfo->net;
+  srand(2222222);
+  double time;
+  char buff[256];
+  char *input = buff;
+  float nms=.45;
+    
+  while(1){
+    if(filename){
+      strncpy(input, filename, 256);
+      if(strlen(input) > 0)
+	if (input[strlen(input) - 1] == 0x0d) input[strlen(input) - 1] = 0;
+    } else {
+      fprintf(stderr, "= Need input filename to proceed further");
+      return;
+    }
+    image im = load_image(input,0,0,net.c);
+    int letterbox = 0;
+    image sized = resize_image(im, net.w, net.h);
+    //image sized = letterbox_image(im, net.w, net.h); letterbox = 1;
+    layer l = net.layers[net.n-1];    
+    
+    float *X = sized.data;
+    time=what_time_is_it_now();
+    network_predict(net, X);
+    results_info->processing_time_in_seconds = what_time_is_it_now()-time;
+    // printf("= %s: Predicted in %f seconds.\n", input, results_info->processing_time_in_seconds);
+    int nboxes = 0;
+    detection *dets = get_network_boxes(&net, im.w, im.h, thresh, hier_thresh, 0, 1, &nboxes, letterbox);
+    //printf("%d\n", nboxes);
+    //if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+    if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
+    get_detections_custom(im, dets, nboxes, thresh, names, l.classes, results_info);
+    // draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
+    draw_detections_v3(im, dets, nboxes, thresh, names, alphabet, l.classes, 1);
+    if (outfile == NULL)
+      save_image(im, "predictions");
+    else
+      save_image(im, outfile);
+    
+    free_detections(dets, nboxes);    
+    free_image(im);
+    free_image(sized);
+    if (filename) break;
+  }
+  
   return;
 }
 
@@ -1285,7 +1394,6 @@ void free_detector_internal_datastructures(struct prep_network_info *prep_netinf
 {
 
   int i = 0, j = 0, nsize=8;
-  network *curnet = prep_netinfo->net;
   
   free_list_contents(prep_netinfo->options, true);
   free_list(prep_netinfo->options);
@@ -1301,8 +1409,7 @@ void free_detector_internal_datastructures(struct prep_network_info *prep_netinf
   for (i = 0; i < prep_netinfo->names_array_len; i++)
     free(prep_netinfo->names[i]);
   free(prep_netinfo->names);
-  free_network(*curnet);
-  free(curnet);
+  free_network(prep_netinfo->net);
   
   return;
 }
