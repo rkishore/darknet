@@ -120,7 +120,7 @@ void *detect_in_thread(void *ptr)
     printf("\033[2J");
     printf("\033[1;1H");
     printf("\nFPS:%.1f\n",fps);
-    printf("frame_count: %d\n", local_frame_count + 1);
+    printf("frame_count: %d letterbox: %d w:%d h:%d\n", local_frame_count + 1, letter_box, det_s.w, det_s.h);
     printf("Objects:\n\n");
     
     ipl_images[demo_index] = det_img;
