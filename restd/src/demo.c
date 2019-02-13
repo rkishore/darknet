@@ -78,7 +78,9 @@ detection *avg_predictions(network *net, int *nboxes)
             count += l.outputs;
         }
     }
-    detection *dets = get_network_boxes(net, buff[0].w, buff[0].h, demo_thresh, demo_hier, 0, 1, nboxes);
+    detection *dets = 0;
+    if ( (buff[0].w > 0) && (buff[0].h > 0) )
+      dets = get_network_boxes(net, buff[0].w, buff[0].h, demo_thresh, demo_hier, 0, 1, nboxes);
     return dets;
 }
 
@@ -122,16 +124,19 @@ void *detect_in_thread(void *ptr)
     }
      */
 
-    if (nms > 0) do_nms_obj(dets, nboxes, l.classes, nms);
-
-    printf("\033[2J");
-    printf("\033[1;1H");
-    printf("\nFPS:%.1f\n",fps);
-    printf("Objects:\n\n");
-    image display = buff[(buff_index+2) % 3];
-    draw_detections(display, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes);
-    free_detections(dets, nboxes);
-
+    if (dets)
+      {
+	if (nms > 0) do_nms_obj(dets, nboxes, l.classes, nms);
+	
+	//printf("\033[2J");
+	//printf("\033[1;1H");
+	//printf("\nFPS:%.1f\n",fps);
+	//printf("Objects:\n\n");
+	image display = buff[(buff_index+2) % 3];
+	draw_detections(display, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes);
+	free_detections(dets, nboxes);
+      }
+    
     demo_index = (demo_index + 1)%demo_frame;
     running = 0;
     return 0;
@@ -251,6 +256,80 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
     }
 }
 
+void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *output_img_prefix)
+{
+
+    pthread_t detect_thread;
+    pthread_t fetch_thread;
+    int i, count = 0;
+    char name[256];
+    
+    demo_names = prep_netinfo->names;
+    demo_alphabet = prep_netinfo->alphabet;
+    demo_classes = prep_netinfo->classes;
+    demo_thresh = thresh;
+    demo_hier = hier_thresh;
+    printf("Demo\n");
+    net = prep_netinfo->net;
+    
+    srand(2222222);
+
+    demo_total = size_network(net);
+    predictions = calloc(demo_frame, sizeof(float*));
+    for (i = 0; i < demo_frame; ++i)
+      {
+        predictions[i] = calloc(demo_total, sizeof(float));
+      }
+    
+    avg = calloc(demo_total, sizeof(float));
+
+    if(filename)
+      {
+	printf("video file: %s\n", filename);
+        cap = open_video_stream(filename, 0, 0, 0, 0);
+      }
+    else
+      {
+	error("No filename specified\n");
+      }
+
+    if(!cap) error("Couldn't open video file\n");
+
+    buff[0] = get_image_from_stream(cap);
+    buff[1] = copy_image(buff[0]);
+    buff[2] = copy_image(buff[0]);
+    buff_letter[0] = letterbox_image(buff[0], net->w, net->h);
+    buff_letter[1] = letterbox_image(buff[0], net->w, net->h);
+    buff_letter[2] = letterbox_image(buff[0], net->w, net->h);
+
+    demo_time = what_time_is_it_now();
+
+    while(!demo_done)
+      {
+        buff_index = (buff_index + 1) %3;
+        if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
+        if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
+
+	fps = 1./(what_time_is_it_now() - demo_time);
+	demo_time = what_time_is_it_now();
+	//printf("Frame count: %d\n", count);
+	
+	if (output_img_prefix)
+	  {
+	    sprintf(name, "%s_%08d", output_img_prefix, count);
+	    save_image(buff[(buff_index + 1)%3], name);
+	  }
+	
+        pthread_join(fetch_thread, 0);
+        pthread_join(detect_thread, 0);
+        ++count;
+      }
+
+    return;
+    
+}
+
+
 /*
    void demo_compare(char *cfg1, char *weight1, char *cfg2, char *weight2, float thresh, int cam_index, const char *filename, char **names, int classes, int delay, char *prefix, int avg_frames, float hier, int w, int h, int frames, int fullscreen)
    {
@@ -345,5 +424,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 {
     fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
 }
+
 #endif
 

@@ -690,6 +690,7 @@ void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datac
   prep_netinfo->names = get_labels(prep_netinfo->name_list);
   prep_netinfo->alphabet = load_alphabet();
   prep_netinfo->net = load_network(cfgfile, weightfile, 0);
+  prep_netinfo->classes = option_find_int(prep_netinfo->options, "classes", 20);
   
   set_batch_network(prep_netinfo->net, 1);
       
@@ -808,6 +809,16 @@ void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename,
         if (filename) break;
     }
     return;
+}
+
+void run_detector_custom_video(struct prep_network_info *prep_netinfo,
+			       char *filename,
+			       float thresh,
+			       float hier_thresh,
+			       char *outfile_img_prefix)
+{
+  demo_custom(prep_netinfo, filename, thresh, hier_thresh, outfile_img_prefix);
+  return;
 }
 
 void free_detector_internal_datastructures(struct prep_network_info *prep_netinfo)

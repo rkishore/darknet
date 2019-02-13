@@ -34,7 +34,13 @@ static void *restful_dispatch_queue = NULL;
 
 extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
 extern void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datacfg, char *cfgfile, char *weightfile);
-extern void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen, struct detection_results *results_info);
+extern void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen,
+				struct detection_results *results_info);
+extern void run_detector_custom_video(struct prep_network_info *prep_netinfo,
+				      char *filename,
+				      float thresh,
+				      float hier_thresh,
+				      char *outfile_img_prefix);
 extern void free_detector_internal_datastructures(struct prep_network_info *prep_netinfo);
 
 classifyapp_struct classifyapp_inst;
@@ -425,11 +431,7 @@ static void *restful_classify_thread_func(void *context)
   restful_comm_struct *restful = (restful_comm_struct *)context;
   classifyapp_struct *classifyapp_info = restful->classifyapp_data;
   int done_handling_req = 0, i = 0;
-  // bool all_done = false, proc_thread_done = false, audio_decoder_thread_done = false, continue_after_params_parsing = false;
   bool continue_after_params_parsing = false;
-  // char config_filename[LARGE_FIXED_STRING_SIZE];       
-  // uint16_t wait_counter = 0;
-  // bool input_thread_done = false;
   struct prep_network_info prep_netinfo_inst;
 
   memset(&restful->cur_classify_info.results_info, 0, sizeof(struct detection_results));
@@ -575,6 +577,12 @@ static void *restful_classify_thread_func(void *context)
 	       restful->classifyapp_data->appconfig.input_mode,
 	       restful->classifyapp_data->appconfig.input_filename,
 	       __FILE__, __LINE__);
+
+	run_detector_custom_video(&prep_netinfo_inst,
+				  restful->classifyapp_data->appconfig.input_filename,
+				  restful->classifyapp_data->appconfig.detection_threshold,
+				  .5,
+				  NULL);
 
 	syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
 	clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
