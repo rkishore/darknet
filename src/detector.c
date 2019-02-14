@@ -1272,52 +1272,49 @@ void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datac
 void get_detections_custom(image im, detection *dets, int num, float thresh, char **names, int classes, struct detection_results *results_info)
 {
 
-  int i,j, k = 0;
-  int left, right, top, bot;
-  box b;
+  int i, left, right, top, bot;
   
-  for(i = 0; i < num; ++i){
-    for(j = 0; j < classes; ++j){
-      if (dets[i].prob[j] > thresh){
+  detection_with_class* selected_detections = get_actual_detections(dets, num, thresh, &results_info->num_labels_detected);
 
-	// printf("%s: %.0f%%\n", names[j], dets[i].prob[j]*100);
+  qsort(selected_detections, results_info->num_labels_detected, sizeof(*selected_detections), compare_by_lefts);
+  for (i = 0; i < results_info->num_labels_detected; ++i) {
+    
+    const int best_class = selected_detections[i].best_class;
+    snprintf(&results_info->labels[i][0], MAX_LABEL_STRING_SIZE-1, "%s", names[best_class]);
+    results_info->confidence[i] = selected_detections[i].det.prob[best_class] * 100;
+    
+    left = (selected_detections[i].det.bbox.x - selected_detections[i].det.bbox.w / 2)*im.w;
+    right = (selected_detections[i].det.bbox.x + selected_detections[i].det.bbox.w / 2)*im.w;
+    top = (selected_detections[i].det.bbox.y - selected_detections[i].det.bbox.h / 2)*im.h;
+    bot = (selected_detections[i].det.bbox.y + selected_detections[i].det.bbox.h / 2)*im.h;
+    
+    results_info->left[i] = left;
+    results_info->right[i] = right;
+    results_info->top[i] = top;
+    results_info->bottom[i] = bot;
 
-	snprintf(&results_info->labels[k][0], MAX_LABEL_STRING_SIZE-1, "%s", names[j]);
-	results_info->confidence[k] = dets[i].prob[j]*100;
+    results_info->top_left_x[i] = left;
+    results_info->top_left_y[i] = top;
+    results_info->top_right_x[i] = right;
+    results_info->top_right_y[i] = top;
+    results_info->bottom_left_x[i] = left;
+    results_info->bottom_left_y[i] = bot;
+    results_info->bottom_right_x[i] = right;
+    results_info->bottom_right_y[i] = bot;
+    
 
-	b = dets[i].bbox;
-	left  = (b.x-b.w/2.)*im.w;
-	right = (b.x+b.w/2.)*im.w;
-	top   = (b.y-b.h/2.)*im.h;
-	bot   = (b.y+b.h/2.)*im.h;
-	    
-	if(left < 0) left = 0;
-	if(right > im.w-1) right = im.w-1;
-	if(top < 0) top = 0;
-	if(bot > im.h-1) bot = im.h-1;
-
-	results_info->top_left_x[k] = left;
-	results_info->top_left_y[k] = top;
-	results_info->top_right_x[k] = right;
-	results_info->top_right_y[k] = top;
-	results_info->bottom_left_x[k] = left;
-	results_info->bottom_left_y[k] = bot;
-	results_info->bottom_right_x[k] = right;
-	results_info->bottom_right_y[k] = bot;
-	
-	results_info->left[k] = left;
-	results_info->right[k] = right;
-	results_info->top[k] = top;
-	results_info->bottom[k] = bot;
-
-	k += 1;
-	
+    /* int j;
+    for (j = 0; j < classes; ++j) {
+      if (selected_detections[i].det.prob[j] > thresh && j != best_class) {
+	printf("%s: %.0f%%\n", names[j], selected_detections[i].det.prob[j] * 100);
       }
-    }
+      } */
+    
   }
 
-  results_info->num_labels_detected = k;
-
+  free(selected_detections);
+  selected_detections = NULL;
+  
   return;
 }
 
@@ -1366,7 +1363,7 @@ void run_detector_custom(struct prep_network_info *prep_netinfo,
     if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
     get_detections_custom(im, dets, nboxes, thresh, names, l.classes, results_info);
     // draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
-    draw_detections_v3(im, dets, nboxes, thresh, names, alphabet, l.classes, 1);
+    draw_detections_v3(im, dets, nboxes, thresh, names, alphabet, l.classes, 0);
     if (outfile == NULL)
       save_image(im, "predictions");
     else
