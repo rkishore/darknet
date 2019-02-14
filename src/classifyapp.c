@@ -629,7 +629,7 @@ int main(int argc, char **argv)
 {
 
   fprintf(stdout, "Classify REST daemon (C) Copyright 2018-2019 igolgi Inc.\n");
-  fprintf(stdout, "\nRELEASE: JAN 2019\n\n");
+  fprintf(stdout, "\nRELEASE: FEB 2019\n\n");
 
   basic_initialization(&argc, argv, "classifyapp");
 

@@ -589,7 +589,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     restful->cur_classify_info.classify_status = CLASSIFY_STATUS_RUNNING;
     clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.start_timestamp);
 
-    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV | input_url: %s (%s) | mode: %s | output_directory: %s | output_fileprefix: %s\n", 
+    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV | input_url: %s (%s) | mode: %s | output_directory: %s | output_filepath: %s\n", 
 	   cur_classifyapp_data->appconfig.input_url,
 	   cur_classifyapp_data->appconfig.input_type,
 	   (input_mode == NULL) ? "unspecified" : cur_classifyapp_data->appconfig.input_mode,

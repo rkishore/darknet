@@ -7,6 +7,7 @@
 #include "gemm.h"
 #include <stdio.h>
 #include <time.h>
+#include <syslog.h>
 
 #ifdef CUDNN
 #pragma comment(lib, "cudnn.lib")
@@ -409,12 +410,12 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
     l.workspace_size = get_workspace_size(l);
     l.activation = activation;
 
-    //fprintf(stderr, "conv  %5d %2d x%2d /%2d  %4d x%4d x%4d   ->  %4d x%4d x%4d\n", n, size, size, stride, w, h, c, l.out_w, l.out_h, l.out_c);
+    //syslog(LOG_DEBUG, "conv  %5d %2d x%2d /%2d  %4d x%4d x%4d   ->  %4d x%4d x%4d\n", n, size, size, stride, w, h, c, l.out_w, l.out_h, l.out_c);
     l.bflops = (2.0 * l.n * l.size*l.size*l.c * l.out_h*l.out_w) / 1000000000.;
-    if (l.xnor && l.use_bin_output) fprintf(stderr, "convXB");
-    else if (l.xnor) fprintf(stderr, "convX ");
-    else fprintf(stderr, "conv  ");
-    fprintf(stderr, "%5d %2d x%2d /%2d  %4d x%4d x%4d   ->  %4d x%4d x%4d %5.3f BF\n", n, size, size, stride, w, h, c, l.out_w, l.out_h, l.out_c, l.bflops);
+    if (l.xnor && l.use_bin_output) syslog(LOG_DEBUG, "convXB");
+    else if (l.xnor) syslog(LOG_DEBUG, "convX ");
+    else syslog(LOG_DEBUG, "conv  ");
+    syslog(LOG_DEBUG, "%5d %2d x%2d /%2d  %4d x%4d x%4d   ->  %4d x%4d x%4d %5.3f BF\n", n, size, size, stride, w, h, c, l.out_w, l.out_h, l.out_c, l.bflops);
 
     return l;
 }

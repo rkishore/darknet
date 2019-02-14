@@ -33,6 +33,7 @@
 #include "upsample_layer.h"
 #include "yolo_layer.h"
 #include <stdint.h>
+#include <syslog.h>
 
 typedef struct{
     char *type;
@@ -734,10 +735,10 @@ network parse_network_cfg_custom(char *filename, int batch)
     n = n->next;
     int count = 0;
     free_section(s);
-    fprintf(stderr, "layer     filters    size              input                output\n");
+    syslog(LOG_DEBUG, "layer     filters    size              input                output");
     while(n){
         params.index = count;
-        fprintf(stderr, "%4d ", count);
+        syslog(LOG_DEBUG, "%4d ", count);
         s = (section *)n->val;
         options = s->options;
         layer l = {0};
@@ -819,7 +820,7 @@ network parse_network_cfg_custom(char *filename, int batch)
     free_list(sections);
     net.outputs = get_network_output_size(net);
     net.output = get_network_output(net);
-    printf("Total BFLOPS %5.3f \n", bflops);
+    syslog(LOG_DEBUG, "Total BFLOPS %5.3f", bflops);
     if(workspace_size){
         //printf("%ld\n", workspace_size);
 #ifdef GPU
@@ -971,7 +972,7 @@ void save_weights_upto(network net, char *filename, int cutoff)
         cuda_set_device(net.gpu_index);
     }
 #endif
-    fprintf(stderr, "Saving weights to %s\n", filename);
+    syslog(LOG_DEBUG, "Saving weights to %s\n", filename);
     FILE *fp = fopen(filename, "wb");
     if(!fp) file_error(filename);
 
@@ -1158,7 +1159,7 @@ void load_weights_upto(network *net, char *filename, int cutoff)
         cuda_set_device(net->gpu_index);
     }
 #endif
-    fprintf(stderr, "Loading weights from %s...", filename);
+    syslog(LOG_DEBUG, "= Loading weights from %s...", filename);
     fflush(stdout);
     FILE *fp = fopen(filename, "rb");
     if(!fp) file_error(filename);
@@ -1170,13 +1171,13 @@ void load_weights_upto(network *net, char *filename, int cutoff)
     fread(&minor, sizeof(int), 1, fp);
     fread(&revision, sizeof(int), 1, fp);
     if ((major * 10 + minor) >= 2) {
-        printf("\n seen 64 \n");
+        syslog(LOG_DEBUG, "seen 64");
         uint64_t iseen = 0;
         fread(&iseen, sizeof(uint64_t), 1, fp);
         *net->seen = iseen;
     }
     else {
-        printf("\n seen 32 \n");
+        syslog(LOG_DEBUG, "seen 32");
         fread(net->seen, sizeof(int), 1, fp);
     }
     int transpose = (major > 1000) || (minor > 1000);
@@ -1224,7 +1225,7 @@ void load_weights_upto(network *net, char *filename, int cutoff)
 #endif
         }
     }
-    fprintf(stderr, "Done!\n");
+    syslog(LOG_INFO, "= Loaded network and weights successfully");
     fclose(fp);
 }
 

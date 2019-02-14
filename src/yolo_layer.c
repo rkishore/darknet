@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <syslog.h>
 
 layer make_yolo_layer(int batch, int w, int h, int n, int total, int *mask, int classes, int max_boxes)
 {
@@ -55,7 +56,7 @@ layer make_yolo_layer(int batch, int w, int h, int n, int total, int *mask, int 
     l.delta_gpu = cuda_make_array(l.delta, batch*l.outputs);
 #endif
 
-    fprintf(stderr, "yolo\n");
+    syslog(LOG_DEBUG, "detection");
     srand(0);
 
     return l;

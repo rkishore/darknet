@@ -614,6 +614,10 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
 	  fps = curr;
 	  before = after;
 	}
+
+	if ((local_frame_count % 100) == 0)
+	  syslog(LOG_INFO, "= For %s, FPS: %0.1f, framecount: %d, %s:%d", filename, fps, local_frame_count+1, __FILE__, __LINE__);
+	
     }
     
     syslog(LOG_INFO, "= Input video stream closed. %s:%d", __FILE__, __LINE__);
