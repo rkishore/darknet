@@ -24,10 +24,8 @@
 
 #include "config.h"
 #include "serialnum.h"
-//#include "speech_proc.h"
 #include "common.h"
 
-//#include "darknet.h"
 #include "cuda.h"
 
 static void 

@@ -1,7 +1,6 @@
 #ifndef YOLO_LAYER_H
 #define YOLO_LAYER_H
 
-//#include "darknet.h"
 #include "layer.h"
 #include "network.h"
 

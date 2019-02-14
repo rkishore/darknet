@@ -25,6 +25,8 @@
 #define CV_RGB(r, g, b) cvScalar( (b), (g), (r), 0 )
 #endif
 
+#include <syslog.h>
+
 extern int check_mistakes;
 int windows = 0;
 
@@ -1071,7 +1073,7 @@ image get_image_from_stream_cpp(CvCapture *cap)
             src = get_webcam_frame(cap);
             if (!src) return make_empty_image(0, 0, 0);
         } while (src->width < 1 || src->height < 1 || src->nChannels < 1);
-        printf("Video stream: %d x %d \n", src->width, src->height);
+        syslog(LOG_INFO, "= Video stream resolution: %d x %d, %s:%d", src->width, src->height, __FILE__, __LINE__);
     }
     else
         src = get_webcam_frame(cap);

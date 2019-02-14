@@ -29,9 +29,9 @@
 // For JSON output
 #include "cJSON.h"
 
-#ifdef CLASSIFYAPP
 #include <syslog.h>
-#include "darknet.h"
+#ifdef CLASSIFYAPP
+#include "classifyapp.h"
 #endif
 
 image get_image_from_stream(CvCapture *cap);
@@ -83,7 +83,7 @@ void *fetch_in_thread(void *ptr)
         in_s = get_image_from_stream_resize(cap, net.w, net.h, net.c, &in_img, cpp_video_capture, dont_close_stream);
     if(!in_s.data){
         //error("Stream closed.");
-        printf("Stream closed.\n");
+      syslog(LOG_DEBUG, "Stream closed, %s:%d", __FILE__, __LINE__);
         flag_exit = 1;
         return EXIT_FAILURE;
     }
@@ -465,7 +465,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 }
 
 #ifdef CLASSIFYAPP
-void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *output_img_prefix, char *out_filename, int dont_show, const char *json_filename, int http_stream_port, int frame_skip)
+void process_video(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *output_img_prefix, char *out_filename, int dont_show, const char *json_filename, int http_stream_port, int frame_skip)
 {
 
     pthread_t detect_thread;
@@ -486,18 +486,26 @@ void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float t
     
     srand(2222222);
     
-    if(filename){
-        printf("video file: %s\n", filename);
+    if(filename)
+      {
+	syslog(LOG_INFO, "= Processing input video file: %s, %s:%d", filename, __FILE__, __LINE__);
         cpp_video_capture = 1;
         cap = get_capture_video_stream(filename);
-    }else{
-      error("No filename specified\n");
-      return;
-    }
+      }
+    else
+      {
+	syslog(LOG_ERR, "= No input video file specified, %s:%d", __FILE__, __LINE__);
+	error("No filename specified\n");
+	return;
+      }
 
-    if (!cap) 
-      error("Couldn't open video file\n");
-
+    if (!cap)
+      {
+	syslog(LOG_ERR, "= Could not open input video file: %s, %s:%d", filename, __FILE__, __LINE__);
+	error("Couldn't open video file\n");
+	return;
+      }
+    
     l = net.layers[net.n-1];
 
     avg = (float *) calloc(l.outputs, sizeof(float));
@@ -509,7 +517,7 @@ void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float t
     for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = (float *)calloc(l.classes, sizeof(float *));
 
     if (l.classes != demo_classes) {
-      printf("Parameters don't match: in cfg-file classes=%d, in data-file classes=%d \n", l.classes, demo_classes);
+      syslog(LOG_ERR, "Parameters don't match: in cfg-file classes=%d, in data-file classes=%d, %s:%d", l.classes, demo_classes, __FILE__, __LINE__);
       return;
     }
 
@@ -608,17 +616,17 @@ void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float t
 	}
     }
     
-    printf("input video stream closed. \n");
+    syslog(LOG_INFO, "= Input video stream closed. %s:%d", __FILE__, __LINE__);
     if (output_video_writer) {
         cvReleaseVideoWriter(&output_video_writer);
-        printf("output_video_writer closed. \n");
+        syslog(LOG_INFO, "= Output_video_writer closed. %s:%d", __FILE__, __LINE__);
     }
 
     if (json_filename)
       {
 	char *full_json_string = cJSON_Print(per_frame_json);
 	if (full_json_string == NULL) {
-	  fprintf(stderr, "Failed to print per_frame_json.\n");
+	  syslog(LOG_ERR, "Failed to print per_frame_json. %s:%d", __FILE__, __LINE__);
 	} else {
 	  FILE *json_ofp = fopen(json_filename, "w");
 	  fwrite(full_json_string, sizeof(char), strlen(full_json_string), json_ofp);

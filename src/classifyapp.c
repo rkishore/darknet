@@ -23,7 +23,7 @@
 #include "comm.h"
 #include "restful.h"
 #include "common.h"
-#include "darknet.h"
+#include "classifyapp.h"
 
 #define APP_VERSION_MAJOR    1
 #define APP_VERSION_MINOR    0
