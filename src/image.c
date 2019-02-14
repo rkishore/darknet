@@ -27,6 +27,10 @@
 
 #include <syslog.h>
 
+#ifdef CLASSIFYAPP
+#include "common.h"
+#endif
+
 extern int check_mistakes;
 int windows = 0;
 
@@ -1186,7 +1190,14 @@ void save_image_jpg(image p, const char *name)
     int x,y,k;
 
     char buff[256];
+#ifdef CLASSIFYAPP
+    if (ends_with((const char *)".jpg", name) == true)
+      sprintf(buff, "%s", name);
+    else
+      sprintf(buff, "%s.jpg", name);
+#else
     sprintf(buff, "%s.jpg", name);
+#endif
 
     IplImage *disp = cvCreateImage(cvSize(p.w,p.h), IPL_DEPTH_8U, p.c);
     int step = disp->widthStep;
@@ -1207,7 +1218,15 @@ void save_image_png(image im, const char *name)
 {
     char buff[256];
     //sprintf(buff, "%s (%d)", name, windows);
+#ifdef CLASSIFYAPP
+    if (ends_with((const char *)".jpg", name) == true)
+      sprintf(buff, "%s", name);
+    else
+      sprintf(buff, "%s.png", name);
+#else
     sprintf(buff, "%s.png", name);
+#endif
+    
     unsigned char *data = calloc(im.w*im.h*im.c, sizeof(char));
     int i,k;
     for(k = 0; k < im.c; ++k){

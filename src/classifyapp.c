@@ -468,10 +468,10 @@ static void *restful_classify_thread_func(void *context)
       free(dispatch_msg);
       dispatch_msg = NULL;
       
-      syslog(LOG_INFO, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_fileprefix: %s",
+      syslog(LOG_INFO, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_filepath: %s",
 	     classifyapp_info->appconfig.input_url, 
 	     classifyapp_info->appconfig.output_directory,
-	     classifyapp_info->appconfig.output_fileprefix);
+	     classifyapp_info->appconfig.output_filepath);
 
       // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
       if (check_input_params_for_sanity(restful) == 0)
@@ -529,7 +529,7 @@ static void *restful_classify_thread_func(void *context)
 			    restful->classifyapp_data->appconfig.input_filename,
 			    restful->classifyapp_data->appconfig.detection_threshold,
 			    .5,
-			    "/tmp/predictions.png",
+			    restful->classifyapp_data->appconfig.output_filepath,
 			    0,
 			    &restful->cur_classify_info.results_info);
 	
