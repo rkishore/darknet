@@ -1120,7 +1120,7 @@ image get_image_from_stream_resize(CvCapture *cap, int w, int h, int c, IplImage
                 src = get_webcam_frame(cap);
                 if (!src) return make_empty_image(0, 0, 0);
             } while (src->width < 1 || src->height < 1 || src->nChannels < 1);
-            printf("Video stream: %d x %d \n", src->width, src->height);
+	    syslog(LOG_INFO, "= Video stream resolution: %d x %d, %s:%d", src->width, src->height, __FILE__, __LINE__);
         } else
             src = get_webcam_frame(cap);
     }
@@ -1152,7 +1152,7 @@ image get_image_from_stream_letterbox(CvCapture *cap, int w, int h, int c, IplIm
                 src = get_webcam_frame(cap);
                 if (!src) return make_empty_image(0, 0, 0);
             } while (src->width < 1 || src->height < 1 || src->nChannels < 1);
-            printf("Video stream: %d x %d \n", src->width, src->height);
+	    syslog(LOG_INFO, "= Video stream resolution: %d x %d, %s:%d", src->width, src->height, __FILE__, __LINE__);
         }
         else
             src = get_webcam_frame(cap);

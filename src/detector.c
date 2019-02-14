@@ -1382,9 +1382,10 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 			       char *filename,
 			       float thresh,
 			       float hier_thresh,
-			       char *outfile_img_prefix)
+			       char *outfile,
+			       char *outjson)
 {
-  process_video(prep_netinfo, filename, thresh, hier_thresh, outfile_img_prefix, "/tmp/output.mp4", 1, (const char *)"/tmp/output.json", 0, 0);
+  process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, (const char *)outjson, 0, 0);
   return;
 }
 
