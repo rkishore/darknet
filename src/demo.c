@@ -30,6 +30,7 @@
 #include "cJSON.h"
 
 #ifdef CLASSIFYAPP
+#include <syslog.h>
 #include "darknet.h"
 #endif
 
@@ -121,11 +122,13 @@ void *detect_in_thread(void *ptr)
     if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
 
 
+#ifndef CLASSIFYAPP
     printf("\033[2J");
     printf("\033[1;1H");
     printf("\nFPS:%.1f\n",fps);
     printf("frame_count: %d letterbox: %d w:%d h:%d\n", local_frame_count + 1, letter_box, det_s.w, det_s.h);
     printf("Objects:\n\n");
+#endif
     
     ipl_images[demo_index] = det_img;
     det_img = ipl_images[(demo_index + FRAMES / 2 + 1) % FRAMES];
@@ -479,7 +482,6 @@ void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float t
     demo_classes = prep_netinfo->classes;
     demo_thresh = thresh;
     // demo_hier = hier_thresh;
-    printf("Demo\n");
     net = prep_netinfo->net;
     
     srand(2222222);
@@ -594,18 +596,18 @@ void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float t
 	det_img = in_img;
 	det_s = in_s;
 	
-    } 
 
-    --delay;
-    if(delay < 0){
-      delay = frame_skip;
-      
-      double after = get_wall_time();
-      float curr = 1./(after - before);
-      fps = curr;
-      before = after;
+	--delay;
+	if(delay < 0){
+	  delay = frame_skip;
+	  
+	  double after = get_wall_time();
+	  float curr = 1./(after - before);
+	  fps = curr;
+	  before = after;
+	}
     }
-
+    
     printf("input video stream closed. \n");
     if (output_video_writer) {
         cvReleaseVideoWriter(&output_video_writer);

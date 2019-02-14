@@ -498,7 +498,9 @@ void draw_detections_cv_v3(IplImage* show_img, detection *dets, int num, float t
                     strcat(labelstr, ", ");
                     strcat(labelstr, names[j]);
                 }
+#ifndef CLASSIFYAPP
                 printf("%s: %.0f%% ", names[j], dets[i].prob[j] * 100);
+#endif
             }
         }
         if (class_id >= 0) {
@@ -579,12 +581,18 @@ void draw_detections_cv_v3(IplImage* show_img, detection *dets, int num, float t
             //cvResetImageROI(copy_img);
 
             cvRectangle(show_img, pt1, pt2, color, width, 8, 0);
+#ifdef CLASSIFYAPP
+            if (ext_output)
+                printf("\t(left_x: %4.0f   top_y: %4.0f   width: %4.0f   height: %4.0f)\n",
+                    (float)left, (float)top, b.w*show_img->width, b.h*show_img->height);
+#else	    
             if (ext_output)
                 printf("\t(left_x: %4.0f   top_y: %4.0f   width: %4.0f   height: %4.0f)\n",
                     (float)left, (float)top, b.w*show_img->width, b.h*show_img->height);
             else
                 printf("\n");
-
+#endif
+	    
             cvRectangle(show_img, pt_text_bg1, pt_text_bg2, color, width, 8, 0);
             cvRectangle(show_img, pt_text_bg1, pt_text_bg2, color, CV_FILLED, 8, 0);    // filled
             CvScalar black_color;
