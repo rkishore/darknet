@@ -29,6 +29,10 @@
 // For JSON output
 #include "cJSON.h"
 
+#ifdef CLASSIFYAPP
+#include "darknet.h"
+#endif
+
 image get_image_from_stream(CvCapture *cap);
 
 static char **demo_names;
@@ -231,7 +235,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 //        cap = cvCaptureFromFile(filename);
 //#else                    // OpenCV 3.x
         cpp_video_capture = 1;
-        cap = get_capture_video_stream(filename);
+        cap = get_capture_video_stream((char *)filename);
 //#endif
     }else{
         printf("Webcam index: %d\n", cam_index);
@@ -442,7 +446,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     free(boxes);
     free(probs);
 
-    free_ptrs(names, net.layers[net.n - 1].classes);
+    free_ptrs((void **)names, net.layers[net.n - 1].classes);
 
     int i;
     const int nsize = 8;
@@ -456,11 +460,203 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
     free_network(net);
 }
+
+#ifdef CLASSIFYAPP
+void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *output_img_prefix, char *out_filename, int dont_show, const char *json_filename, int http_stream_port, int frame_skip)
+{
+
+    pthread_t detect_thread;
+    pthread_t fetch_thread;
+    int j;
+    char name[256];
+    layer l;
+    CvVideoWriter* output_video_writer = NULL;    // cv::VideoWriter output_video;
+    double before = 0.0;
+    int delay = frame_skip;
+    
+    demo_names = prep_netinfo->names;
+    demo_alphabet = prep_netinfo->alphabet;
+    demo_classes = prep_netinfo->classes;
+    demo_thresh = thresh;
+    // demo_hier = hier_thresh;
+    printf("Demo\n");
+    net = prep_netinfo->net;
+    
+    srand(2222222);
+    
+    if(filename){
+        printf("video file: %s\n", filename);
+        cpp_video_capture = 1;
+        cap = get_capture_video_stream(filename);
+    }else{
+      error("No filename specified\n");
+      return;
+    }
+
+    if (!cap) 
+      error("Couldn't open video file\n");
+
+    l = net.layers[net.n-1];
+
+    avg = (float *) calloc(l.outputs, sizeof(float));
+    for(j = 0; j < FRAMES; ++j) predictions[j] = (float *) calloc(l.outputs, sizeof(float));
+    for(j = 0; j < FRAMES; ++j) images[j] = make_image(1,1,3);
+
+    boxes = (box *)calloc(l.w*l.h*l.n, sizeof(box));
+    probs = (float **)calloc(l.w*l.h*l.n, sizeof(float *));
+    for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = (float *)calloc(l.classes, sizeof(float *));
+
+    if (l.classes != demo_classes) {
+      printf("Parameters don't match: in cfg-file classes=%d, in data-file classes=%d \n", l.classes, demo_classes);
+      return;
+    }
+
+    if (json_filename)
+      per_frame_json = cJSON_CreateObject();
+
+    flag_exit = 0;
+
+    fetch_in_thread(0);
+    det_img = in_img;
+    det_s = in_s;
+
+    fetch_in_thread(0);
+
+    detect_in_thread((void *)filename);
+
+    det_img = in_img;
+    det_s = in_s;
+
+    for(j = 0; j < FRAMES/2; ++j){
+        fetch_in_thread(0);
+	detect_in_thread((void *)filename);
+	det_img = in_img;
+        det_s = in_s;
+    }
+
+    if (out_filename && !flag_exit)
+    {
+        CvSize size;
+        int src_fps = 25;
+
+        size.width = det_img->width, size.height = det_img->height;
+        src_fps = get_stream_fps(cap, cpp_video_capture);
+
+        //const char* output_name = "test_dnn_out.avi";
+        output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('H', '2', '6', '4'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('D', 'I', 'V', 'X'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'J', 'P', 'G'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'P', '4', 'V'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'P', '4', '2'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('X', 'V', 'I', 'D'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('W', 'M', 'V', '2'), src_fps, size, 1);
+    }
+
+    before = get_wall_time();
+    while(1) {
+      
+        ++local_frame_count;
+
+	if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
+	if(pthread_create(&detect_thread, 0, detect_in_thread, (void *)filename)) error("Thread creation failed");
+	
+	if(output_img_prefix){
+	  sprintf(name, "%s_%08d.jpg", output_img_prefix, local_frame_count);
+	  cvSaveImage(name, show_img, 0);
+	  //save_image(disp, buff);
+	}
+	
+	// if you run it with param -http_port 8090  then open URL in your web-browser: http://localhost:8090
+	if (http_stream_port > 0 && show_img) {
+	  //int port = 8090;
+	  int port = http_stream_port;
+	  int timeout = 200;
+	  int jpeg_quality = 30;    // 1 - 100
+	  send_mjpeg(show_img, port, timeout, jpeg_quality);
+	}
+	
+	// save video file
+	if (output_video_writer && show_img) {
+	  cvWriteFrame(output_video_writer, show_img);
+	  // printf("\n cvWriteFrame \n");
+	}
+	
+	cvReleaseImage(&show_img);
+	
+	pthread_join(fetch_thread, 0);
+	pthread_join(detect_thread, 0);
+	
+	if (flag_exit == 1) break;
+	
+	if(delay == 0){
+	  show_img = det_img;
+	}
+	det_img = in_img;
+	det_s = in_s;
+	
+    } 
+
+    --delay;
+    if(delay < 0){
+      delay = frame_skip;
+      
+      double after = get_wall_time();
+      float curr = 1./(after - before);
+      fps = curr;
+      before = after;
+    }
+
+    printf("input video stream closed. \n");
+    if (output_video_writer) {
+        cvReleaseVideoWriter(&output_video_writer);
+        printf("output_video_writer closed. \n");
+    }
+
+    if (json_filename)
+      {
+	char *full_json_string = cJSON_Print(per_frame_json);
+	if (full_json_string == NULL) {
+	  fprintf(stderr, "Failed to print per_frame_json.\n");
+	} else {
+	  FILE *json_ofp = fopen(json_filename, "w");
+	  fwrite(full_json_string, sizeof(char), strlen(full_json_string), json_ofp);
+	  fclose(json_ofp);
+	}
+	cJSON_Delete(per_frame_json);
+      }
+    
+    // free memory
+    cvReleaseImage(&show_img);
+    cvReleaseImage(&in_img);
+    free_image(in_s);
+
+    free(avg);
+    for (j = 0; j < FRAMES; ++j) free(predictions[j]);
+    for (j = 0; j < FRAMES; ++j) free_image(images[j]);
+
+    for (j = 0; j < l.w*l.h*l.n; ++j) free(probs[j]);
+    free(boxes);
+    free(probs);
+    
+    return;
+    
+}
+#endif
+
 #else
 void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
 	  int frame_skip, char *prefix, char *out_filename, int http_stream_port, int dont_show, int ext_output, char *json_filename)
 {
-    fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
+  fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
 }
+
+#ifdef CLASSIFYAPP
+void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh,
+		 char *output_img_prefix, char *out_filename, int dont_show, const char *json_filename, int http_stream_port, int frame_skip)
+{
+  fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
+}
+#endif
+  
 #endif
 
