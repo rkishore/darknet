@@ -299,6 +299,9 @@ static int check_input_url(restful_comm_struct *restful_ptr)
 	  syslog(LOG_ERR, "= Cannot support URLs that don't end in .ts or .mp4 yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
 	  retval = -1;
 	}
+
+      memset(mod_config()->output_json_filepath, 0, LARGE_FIXED_STRING_SIZE);
+      memcpy(mod_config()->output_json_filepath, cur_classifyapp_data->appconfig.output_json_filepath, strlen(cur_classifyapp_data->appconfig.output_json_filepath));
       
     }
   

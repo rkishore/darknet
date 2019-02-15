@@ -24,6 +24,7 @@ struct Config
   char           image_url[LARGE_FIXED_STRING_SIZE];
   char           output_directory[LARGE_FIXED_STRING_SIZE];
   char           output_filepath[LARGE_FIXED_STRING_SIZE];
+  char           output_json_filepath[LARGE_FIXED_STRING_SIZE];
   char           input_type[SMALL_FIXED_STRING_SIZE];
   char           input_mode[SMALL_FIXED_STRING_SIZE];
 

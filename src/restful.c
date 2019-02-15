@@ -628,11 +628,16 @@ static void copy_to_global_config(restful_comm_struct *restful_ptr)
   memset(mod_config()->output_filepath, 0, LARGE_FIXED_STRING_SIZE);
   memcpy(mod_config()->output_filepath, classifyapp_info->appconfig.output_filepath, strlen(classifyapp_info->appconfig.output_filepath));
 
-  syslog(LOG_INFO, "= COPIED DISPATCH_MSG | image_url: %s (%s) | output_directory: %s | output_filepath: %s\n", 
+  memset(mod_config()->output_json_filepath, 0, LARGE_FIXED_STRING_SIZE);
+  if (strlen(classifyapp_info->appconfig.input_mode) > 0)
+    memcpy(mod_config()->output_json_filepath, classifyapp_info->appconfig.output_json_filepath, strlen(classifyapp_info->appconfig.output_json_filepath));
+
+  syslog(LOG_INFO, "= COPIED DISPATCH_MSG | image_url: %s (%s) | output_directory: %s | output_filepath: %s | output_json_filepath: %s\n", 
 	 get_config()->image_url,
 	 get_config()->input_type,
 	 get_config()->output_directory,
-	 get_config()->output_filepath);
+	 get_config()->output_filepath,
+	 get_config()->output_json_filepath);
 
   return;
 }
@@ -769,7 +774,7 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
   // classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
   struct tm *ptm;
   char start_time_string[MEDIUM_FIXED_STRING_SIZE];
-
+  
   *response_json = cJSON_CreateObject();
 
   /* pthread_mutex_lock(&restful_ptr->cur_classify_info.job_percent_complete_lock);
@@ -788,6 +793,9 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
     cJSON_AddStringToObject(*response_json, "input", get_config()->image_url);
     cJSON_AddStringToObject(*response_json, "output_dir", get_config()->output_directory);
     cJSON_AddStringToObject(*response_json, "output_filepath", get_config()->output_filepath);
+    if (!strcmp(get_config()->input_mode, "video"))
+      cJSON_AddStringToObject(*response_json, "output_json_filepath", get_config()->output_json_filepath);
+    
     cJSON_AddItemToObject(*response_json, "config", config_json=cJSON_CreateObject());
     cJSON_AddNumberToObject(config_json, "detection_threshold", restful_ptr->classifyapp_data->appconfig.detection_threshold);
 
@@ -796,31 +804,34 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
       cJSON_AddStringToObject(*response_json, "status", "finished");
       cJSON_AddNullToObject(*response_json, "error_msg");
 
-      cJSON_AddItemToObject(*response_json, "results", results_json=cJSON_CreateObject());
-      cJSON_AddNumberToObject(results_json, "num_labels_detected", restful_ptr->cur_classify_info.results_info.num_labels_detected);
-
-      labels_array_json = cJSON_CreateArray();
-      for ( i=0; i<restful_ptr->cur_classify_info.results_info.num_labels_detected; i++)
+      if (!strcmp(get_config()->input_mode, "image"))
 	{
-	  cJSON_AddItemToArray(labels_array_json, cJSON_CreateString((const char *)restful_ptr->cur_classify_info.results_info.labels[i]));
+	  cJSON_AddItemToObject(*response_json, "results", results_json=cJSON_CreateObject());
+	  cJSON_AddNumberToObject(results_json, "num_labels_detected", restful_ptr->cur_classify_info.results_info.num_labels_detected);
+	  
+	  labels_array_json = cJSON_CreateArray();
+	  for ( i=0; i<restful_ptr->cur_classify_info.results_info.num_labels_detected; i++)
+	    {
+	      cJSON_AddItemToArray(labels_array_json, cJSON_CreateString((const char *)restful_ptr->cur_classify_info.results_info.labels[i]));
+	    }
+	  cJSON_AddItemToObject(results_json, "labels", labels_array_json);
+	  
+	  confidence_array_json = cJSON_CreateFloatArray((const float *)restful_ptr->cur_classify_info.results_info.confidence, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+	  cJSON_AddItemToObject(results_json, "confidence", confidence_array_json);
+	  cJSON_AddNumberToObject(results_json, "processing_time_in_ms", restful_ptr->cur_classify_info.results_info.processing_time_in_seconds*1000.0);
+	  
+	  left_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.left, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+	  cJSON_AddItemToObject(results_json, "left", left_array_json);
+	  
+	  right_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.right, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+	  cJSON_AddItemToObject(results_json, "right", right_array_json);
+	  
+	  top_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.top, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+	  cJSON_AddItemToObject(results_json, "top", top_array_json);
+	  
+	  bottom_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.bottom, restful_ptr->cur_classify_info.results_info.num_labels_detected);
+	  cJSON_AddItemToObject(results_json, "bottom", bottom_array_json);
 	}
-      cJSON_AddItemToObject(results_json, "labels", labels_array_json);
-
-      confidence_array_json = cJSON_CreateFloatArray((const float *)restful_ptr->cur_classify_info.results_info.confidence, restful_ptr->cur_classify_info.results_info.num_labels_detected);
-      cJSON_AddItemToObject(results_json, "confidence", confidence_array_json);
-      cJSON_AddNumberToObject(results_json, "processing_time_in_ms", restful_ptr->cur_classify_info.results_info.processing_time_in_seconds*1000.0);
-
-      left_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.left, restful_ptr->cur_classify_info.results_info.num_labels_detected);
-      cJSON_AddItemToObject(results_json, "left", left_array_json);
-
-      right_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.right, restful_ptr->cur_classify_info.results_info.num_labels_detected);
-      cJSON_AddItemToObject(results_json, "right", right_array_json);
-
-      top_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.top, restful_ptr->cur_classify_info.results_info.num_labels_detected);
-      cJSON_AddItemToObject(results_json, "top", top_array_json);
-
-      bottom_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.bottom, restful_ptr->cur_classify_info.results_info.num_labels_detected);
-      cJSON_AddItemToObject(results_json, "bottom", bottom_array_json);
       
     } else {
 
