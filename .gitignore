@@ -33,3 +33,4 @@ CMakeLists.txt
 restd/bin/
 classifyapp_frontend/db.sqlite3
 classifyapp_frontend/*/*.pyc
+classifyapp-rest/venv/
