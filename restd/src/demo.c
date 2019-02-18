@@ -8,6 +8,7 @@
 #include "image.h"
 #include "demo.h"
 #include <sys/time.h>
+#include <syslog.h>
 
 #define DEMO 1
 
@@ -314,15 +315,20 @@ void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float t
 	demo_time = what_time_is_it_now();
 	//printf("Frame count: %d\n", count);
 	
-	if (output_img_prefix)
+	/* if (output_img_prefix)
 	  {
 	    sprintf(name, "%s_%08d", output_img_prefix, count);
 	    save_image(buff[(buff_index + 1)%3], name);
 	  }
+	*/
 	
         pthread_join(fetch_thread, 0);
         pthread_join(detect_thread, 0);
         ++count;
+
+	if ((count % 100) == 0)
+	  syslog(LOG_INFO, "= For %s, FPS: %0.1f, framecount: %d, %s:%d", filename, fps, count+1, __FILE__, __LINE__);
+
       }
 
     return;

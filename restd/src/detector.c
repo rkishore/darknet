@@ -815,9 +815,10 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 			       char *filename,
 			       float thresh,
 			       float hier_thresh,
-			       char *outfile_img_prefix)
+			       char *outfilepath,
+			       char *outjsonpath)
 {
-  demo_custom(prep_netinfo, filename, thresh, hier_thresh, outfile_img_prefix);
+  demo_custom(prep_netinfo, filename, thresh, hier_thresh, outfilepath);
   return;
 }
 

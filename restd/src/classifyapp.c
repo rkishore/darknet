@@ -40,7 +40,8 @@ extern void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 				      char *filename,
 				      float thresh,
 				      float hier_thresh,
-				      char *outfile_img_prefix);
+				      char *outfile,
+				      char *outjson);
 extern void free_detector_internal_datastructures(struct prep_network_info *prep_netinfo);
 
 classifyapp_struct classifyapp_inst;
@@ -298,6 +299,9 @@ static int check_input_url(restful_comm_struct *restful_ptr)
 	  syslog(LOG_ERR, "= Cannot support URLs that don't end in .ts or .mp4 yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
 	  retval = -1;
 	}
+
+      memset(mod_config()->output_json_filepath, 0, LARGE_FIXED_STRING_SIZE);
+      memcpy(mod_config()->output_json_filepath, cur_classifyapp_data->appconfig.output_json_filepath, strlen(cur_classifyapp_data->appconfig.output_json_filepath));
       
     }
   
@@ -468,10 +472,10 @@ static void *restful_classify_thread_func(void *context)
       free(dispatch_msg);
       dispatch_msg = NULL;
       
-      syslog(LOG_INFO, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_fileprefix: %s",
+      syslog(LOG_INFO, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_filepath: %s",
 	     classifyapp_info->appconfig.input_url, 
 	     classifyapp_info->appconfig.output_directory,
-	     classifyapp_info->appconfig.output_fileprefix);
+	     classifyapp_info->appconfig.output_filepath);
 
       // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
       if (check_input_params_for_sanity(restful) == 0)
@@ -529,7 +533,7 @@ static void *restful_classify_thread_func(void *context)
 			    restful->classifyapp_data->appconfig.input_filename,
 			    restful->classifyapp_data->appconfig.detection_threshold,
 			    .5,
-			    "/tmp/predictions.png",
+			    restful->classifyapp_data->appconfig.output_filepath,
 			    0,
 			    &restful->cur_classify_info.results_info);
 	
@@ -582,7 +586,8 @@ static void *restful_classify_thread_func(void *context)
 				  restful->classifyapp_data->appconfig.input_filename,
 				  restful->classifyapp_data->appconfig.detection_threshold,
 				  .5,
-				  NULL);
+				  restful->classifyapp_data->appconfig.output_filepath,
+				  restful->classifyapp_data->appconfig.output_json_filepath);
 
 	syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
 	clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
@@ -627,7 +632,7 @@ int main(int argc, char **argv)
 {
 
   fprintf(stdout, "Classify REST daemon (C) Copyright 2018-2019 igolgi Inc.\n");
-  fprintf(stdout, "\nRELEASE: JAN 2019\n\n");
+  fprintf(stdout, "\nRELEASE: FEB 2019\n\n");
 
   basic_initialization(&argc, argv, "classifyapp");
 
