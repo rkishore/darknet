@@ -1,0 +1,35 @@
+Copyright igolgi Inc. 2019
+
+DEPENDENCIES: 
+
+1. Python 2.7 
+2. Python Flask
+
+Execute "pip install flask" before running the app
+
+TO RUN: 
+
+Execute "python app.py" in a terminal (cmdline)
+
+NOTES: 
+
+- The server is running on port 10001 (can be changed inside the code if needed)
+- The server can be accessed on the IP address of the host on which the server is running or at localhost/127.0.0.1 as well
+
+TO TEST:
+
+1. TO SEE HTTP GET RESPONSE PRIOR TO ANY HTTP POST REQUESTS TO SERVER, RUN on cmdline
+
+curl -i http://localhost:10001/api/v0/classify/1
+
+2. TO SEE SUCCESSFUL HTTP POST RESPONSE, RUN on cmdline
+
+curl -i -H "Content-Type: application/json" -X POST -d '{"input": "/mnt/inputs/sample1.mp4", "type": "file", "output_dir": "/tmp", "output_filepath": "/mnt/outputs/sample1-output.mp4", "mode": "video", "output_json_filepath": "/mnt/outputs/sample1-output.json", "config": {"detection_threshold": 0.5}}' http://localhost:10001/api/v0/classify 
+
+3. TO SEE HTTP 503 BUSY, execute another HTTP POST within 10 seconds of an actively running one
+
+4. TO SEE HTTP GET AFTER HTTP POST, RUN on cmdline
+
+curl -i http://localhost:10001/api/v0/classify/1
+
+
