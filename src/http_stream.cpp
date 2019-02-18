@@ -266,6 +266,19 @@ int get_stream_fps_cpp(CvCapture *cap) {
     }
     return fps;
 }
+
+int close_cap_cpp(CvCapture *cap) {
+    try {
+        cv::VideoCapture &cpp_cap = *(cv::VideoCapture *)cap;
+	cpp_cap.release();
+    }
+    catch (...) {
+        std::cout << " Can't release cap \n";
+	return -1;
+    }
+    return 0;
+}
+  
 // ----------------------------------------
 extern "C" {
     image ipl_to_image(IplImage* src);    // image.c

@@ -587,8 +587,11 @@ void draw_detections_cv_v3(IplImage* show_img, detection *dets, int num, float t
             //cvSetImageROI(copy_img, rect);
             //cvSaveImage(image_name, copy_img, 0);
             //cvResetImageROI(copy_img);
-
+	    printf("\t(left_x: %4.0f   top_y: %4.0f   width: %4.0f   height: %4.0f   right: %d   bot: %d)\n",
+		   (float)left, (float)top, b.w*show_img->width, b.h*show_img->height, right, bot);
+	    
             cvRectangle(show_img, pt1, pt2, color, width, 8, 0);
+
 #ifdef CLASSIFYAPP
             if (ext_output)
                 printf("\t(left_x: %4.0f   top_y: %4.0f   width: %4.0f   height: %4.0f)\n",
@@ -608,7 +611,9 @@ void draw_detections_cv_v3(IplImage* show_img, detection *dets, int num, float t
             CvFont font;
             cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX, font_size, font_size, 0, font_size * 3, 8);
             cvPutText(show_img, labelstr, pt_text, &font, black_color);
-        }
+        } else {
+	  printf("\t no classes\n");
+	}
     }
     if (ext_output) {
         fflush(stdout);
@@ -1120,7 +1125,10 @@ image get_image_from_stream_resize(CvCapture *cap, int w, int h, int c, IplImage
             once = 0;
             do {
                 src = get_webcam_frame(cap);
-                if (!src) return make_empty_image(0, 0, 0);
+                if (!src) {
+		  syslog(LOG_INFO, "= Returning empty image, %s:%d", __FILE__, __LINE__);
+		  return make_empty_image(0, 0, 0);
+		}
             } while (src->width < 1 || src->height < 1 || src->nChannels < 1);
 	    syslog(LOG_INFO, "= Video stream resolution: %d x %d, %s:%d", src->width, src->height, __FILE__, __LINE__);
         } else
@@ -1129,7 +1137,10 @@ image get_image_from_stream_resize(CvCapture *cap, int w, int h, int c, IplImage
     else src = cvQueryFrame(cap);
 
     if (cpp_video_capture)
-        if(!wait_for_stream(cap, src, dont_close)) return make_empty_image(0, 0, 0);
+      if(!wait_for_stream(cap, src, dont_close)) {
+	syslog(LOG_INFO, "= Returning empty image, %s:%d", __FILE__, __LINE__);
+	return make_empty_image(0, 0, 0);
+      }
     IplImage* new_img = cvCreateImage(cvSize(w, h), IPL_DEPTH_8U, c);
     *in_img = cvCreateImage(cvSize(src->width, src->height), IPL_DEPTH_8U, c);
     cvResize(src, *in_img, CV_INTER_LINEAR);
@@ -1183,6 +1194,18 @@ int get_stream_fps(CvCapture *cap, int cpp_video_capture)
         fps = cvGetCaptureProperty(cap, CV_CAP_PROP_FPS);
     }
     return fps;
+}
+
+int close_stream(CvCapture *cap, int cpp_video_capture)
+{
+  if (cpp_video_capture) {
+    syslog(LOG_INFO, "= Closing open input video stream, %s:%d", __FILE__, __LINE__);
+    return close_cap_cpp(cap);
+  }
+  else {
+    cvReleaseCapture(&cap);
+  }
+  return 0;
 }
 
 void save_image_jpg(image p, const char *name)

@@ -30,9 +30,7 @@
 #include "cJSON.h"
 
 #include <syslog.h>
-#ifdef CLASSIFYAPP
 #include "classifyapp.h"
-#endif
 
 image get_image_from_stream(CvCapture *cap);
 
@@ -63,9 +61,10 @@ void show_image_cv_ipl(IplImage *disp, const char *name);
 image get_image_from_stream_resize(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 image get_image_from_stream_letterbox(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 int get_stream_fps(CvCapture *cap, int cpp_video_capture);
-IplImage* in_img;
-IplImage* det_img;
-IplImage* show_img;
+int close_stream(CvCapture *cap, int cpp_video_capture);
+IplImage* in_img = NULL;
+IplImage* det_img = NULL;
+IplImage* show_img = NULL;
 
 static int flag_exit;
 static int letter_box = 0;
@@ -83,7 +82,7 @@ void *fetch_in_thread(void *ptr)
         in_s = get_image_from_stream_resize(cap, net.w, net.h, net.c, &in_img, cpp_video_capture, dont_close_stream);
     if(!in_s.data){
         //error("Stream closed.");
-      syslog(LOG_DEBUG, "Stream closed, %s:%d", __FILE__, __LINE__);
+        syslog(LOG_INFO, "= Stream closed, %s:%d", __FILE__, __LINE__);
         flag_exit = 1;
         return EXIT_FAILURE;
     }
@@ -126,8 +125,10 @@ void *detect_in_thread(void *ptr)
     printf("\033[2J");
     printf("\033[1;1H");
     printf("\nFPS:%.1f\n",fps);
-    printf("frame_count: %d letterbox: %d w:%d h:%d\n", local_frame_count + 1, letter_box, det_s.w, det_s.h);
+    printf("frame_count: %d letterbox: %d w:%d h:%d\n", local_frame_count, letter_box, det_s.w, det_s.h);
     printf("Objects:\n\n");
+#else
+    printf("frame_count: %d letterbox: %d w:%d h:%d\n", local_frame_count, letter_box, det_s.w, det_s.h);
 #endif
     
     ipl_images[demo_index] = det_img;
@@ -379,7 +380,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             // save video file
             if (output_video_writer && show_img) {
                 cvWriteFrame(output_video_writer, show_img);
-                printf("\n cvWriteFrame \n");
+                // printf("\n cvWriteFrame \n");
             }
 
             cvReleaseImage(&show_img);
@@ -449,8 +450,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     free(boxes);
     free(probs);
 
-    free_ptrs((void **)names, net.layers[net.n - 1].classes);
-
+    // free_ptrs((void **)names, net.layers[net.n - 1].classes);
+       
     int i;
     const int nsize = 8;
     for (j = 0; j < nsize; ++j) {
@@ -462,10 +463,12 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     free(alphabet);
 
     free_network(net);
+    
 }
 
 #ifdef CLASSIFYAPP
-void process_video(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *output_img_prefix, char *out_filename, int dont_show, const char *json_filename, int http_stream_port, int frame_skip)
+void process_video(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh,
+		   char *output_img_prefix, char *out_filename, int dont_show, const char *json_filename, int http_stream_port, int frame_skip)
 {
 
     pthread_t detect_thread;
@@ -529,19 +532,22 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
     fetch_in_thread(0);
     det_img = in_img;
     det_s = in_s;
-
+    local_frame_count++;
+      
     fetch_in_thread(0);
 
     detect_in_thread((void *)filename);
 
     det_img = in_img;
     det_s = in_s;
-
+    local_frame_count++;
+    
     for(j = 0; j < FRAMES/2; ++j){
         fetch_in_thread(0);
 	detect_in_thread((void *)filename);
 	det_img = in_img;
         det_s = in_s;
+	local_frame_count++;
     }
 
     if (out_filename && !flag_exit)
@@ -614,10 +620,10 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
 	  fps = curr;
 	  before = after;
 	}
-
+	
 	if ((local_frame_count % 100) == 0)
 	  syslog(LOG_INFO, "= For %s, FPS: %0.1f, framecount: %d, %s:%d", filename, fps, local_frame_count+1, __FILE__, __LINE__);
-	
+
     }
     
     syslog(LOG_INFO, "= Input video stream closed. %s:%d", __FILE__, __LINE__);
@@ -643,7 +649,13 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
     cvReleaseImage(&show_img);
     cvReleaseImage(&in_img);
     free_image(in_s);
-
+    show_img = NULL;
+    in_img = NULL;
+    det_img = NULL;
+    local_frame_count = 0;
+    close_stream(cap, cpp_video_capture);
+    cap = NULL;
+    
     free(avg);
     for (j = 0; j < FRAMES; ++j) free(predictions[j]);
     for (j = 0; j < FRAMES; ++j) free_image(images[j]);

@@ -1385,7 +1385,23 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 			       char *outfile,
 			       char *outjson)
 {
-  process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, (const char *)outjson, 0, 0);
+  // process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, (const char *)outjson, 0, 0);
+  demo((char *)get_config()->dnn_config_file,
+       (char *)get_config()->dnn_weights_file,
+       thresh,
+       hier_thresh,
+       -1, // camindex
+       filename,
+       prep_netinfo->names,
+       prep_netinfo->classes,
+       0, // frame_skip
+       NULL, // prefix
+       outfile, 
+       -1, // http_stream_port
+       1, // dont_show
+       0, // ext_output
+       outjson);
+
   return;
 }
 
