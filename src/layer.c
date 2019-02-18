@@ -12,7 +12,7 @@ void free_layer(layer l)
 		return;
 	}
 
-	#ifdef GPU
+#ifdef GPU
 #ifdef CUDNN
 	cudnnDestroyTensorDescriptor(l.normDstTensorDesc);
 	cudnnDestroyTensorDescriptor(l.normDstTensorDescF16);
@@ -24,6 +24,7 @@ void free_layer(layer l)
 	cudnnDestroyTensorDescriptor(l.ddstTensorDesc);
 	cudnnDestroyFilterDescriptor(l.dweightDesc);
 	cudnnDestroyConvolutionDescriptor(l.convDesc);
+	cudnnDestroyPoolingDescriptor(l.poolingDesc);
 #endif
 #endif	
 	if (l.mask)               free(l.mask);

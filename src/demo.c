@@ -38,8 +38,9 @@ static char **demo_names;
 static image **demo_alphabet;
 static int demo_classes;
 
-static float **probs;
-static box *boxes;
+static int nboxes = 0;
+static detection *dets = NULL;
+
 static network net;
 static image in_s ;
 static image det_s;
@@ -48,6 +49,8 @@ static int cpp_video_capture = 0;
 static float fps = 0;
 static float demo_thresh = 0;
 static int demo_ext_output = 0;
+static long long int frame_id = 0;
+static int demo_json_port = -1;
 
 static float *predictions[FRAMES];
 static int demo_index = 0;
@@ -55,22 +58,23 @@ static image images[FRAMES];
 static IplImage* ipl_images[FRAMES];
 static float *avg;
 
-void draw_detections_cv(IplImage* show_img, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes);
 void draw_detections_cv_v3(IplImage* show_img, detection *dets, int num, float thresh, char **names, image **alphabet, int classes, int ext_output);
 void show_image_cv_ipl(IplImage *disp, const char *name);
+void save_cv_png(IplImage *img, const char *name);
+void save_cv_jpg(IplImage *img, const char *name);
 image get_image_from_stream_resize(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 image get_image_from_stream_letterbox(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 int get_stream_fps(CvCapture *cap, int cpp_video_capture);
 int close_stream(CvCapture *cap, int cpp_video_capture);
-IplImage* in_img = NULL;
-IplImage* det_img = NULL;
-IplImage* show_img = NULL;
+IplImage* in_img;
+IplImage* det_img;
+IplImage* show_img;
 
 static int flag_exit;
 static int letter_box = 0;
-static int local_frame_count = 0;
 
 cJSON *per_frame_json = NULL;
+static int local_frame_count = 0;
 
 void *fetch_in_thread(void *ptr)
 {
@@ -93,17 +97,9 @@ void *fetch_in_thread(void *ptr)
 
 void *detect_in_thread(void *ptr)
 {
-    float nms = .45;    // 0.4F
-    
     layer l = net.layers[net.n-1];
     float *X = det_s.data;
     float *prediction = network_predict(net, X);
-
-    cJSON *regions_json = NULL, *regions_array_json = NULL, *region_json = NULL;
-    char tmp_char_buff[128];
-    int i,j, num_labels_detected = 0;
-    int left, right, top, bot;
-    box b;
 
     memcpy(predictions[demo_index], prediction, l.outputs*sizeof(float));
     mean_arrays(predictions, FRAMES, l.outputs, avg);
@@ -111,94 +107,14 @@ void *detect_in_thread(void *ptr)
 
     free_image(det_s);
 
-    int nboxes = 0;
-    detection *dets = NULL;
+    ipl_images[demo_index] = det_img;
+    det_img = ipl_images[(demo_index + FRAMES / 2 + 1) % FRAMES];
+    demo_index = (demo_index + 1) % FRAMES;
+
     if (letter_box)
         dets = get_network_boxes(&net, in_img->width, in_img->height, demo_thresh, demo_thresh, 0, 1, &nboxes, 1); // letter box
     else
-        dets = get_network_boxes(&net, det_s.w, det_s.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
-    //if (nms) do_nms_obj(dets, nboxes, l.classes, nms);    // bad results
-    if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
-
-
-#ifndef CLASSIFYAPP
-    printf("\033[2J");
-    printf("\033[1;1H");
-    printf("\nFPS:%.1f\n",fps);
-    printf("frame_count: %d letterbox: %d w:%d h:%d\n", local_frame_count, letter_box, det_s.w, det_s.h);
-    printf("Objects:\n\n");
-#else
-    printf("frame_count: %d letterbox: %d w:%d h:%d\n", local_frame_count, letter_box, det_s.w, det_s.h);
-#endif
-    
-    ipl_images[demo_index] = det_img;
-    det_img = ipl_images[(demo_index + FRAMES / 2 + 1) % FRAMES];
-    demo_index = (demo_index + 1)%FRAMES;
-
-    draw_detections_cv_v3(det_img, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
-
-    if (det_img != NULL)
-      {
-	if (per_frame_json != NULL)
-	  {
-	    memset(tmp_char_buff, 0, 128);
-	    if (ptr != NULL)
-	      sprintf(tmp_char_buff, "%s/%08d.jpg", (char *)ptr, local_frame_count);
-	    else
-	      sprintf(tmp_char_buff, "%08d.jpg", local_frame_count);
-
-	    cJSON_AddItemToObject(per_frame_json, tmp_char_buff, regions_json=cJSON_CreateObject());
-
-	    for(i = 0; i < nboxes; ++i){
-	      for(j = 0; j < demo_classes; ++j){
-		if (dets[i].prob[j] > demo_thresh){
-		  num_labels_detected += 1;
-		}
-	      }
-	    }
-
-	    if (num_labels_detected > 0)
-	      {
-	
-		regions_array_json = cJSON_AddArrayToObject(regions_json, "regions");
-	
-		for(i = 0; i < nboxes; ++i){
-		  for(j = 0; j < demo_classes; ++j){
-		    if (dets[i].prob[j] > demo_thresh){
-	      
-		      region_json = cJSON_CreateObject();
-
-		      cJSON_AddStringToObject(region_json, "category", demo_names[j]);
-
-		      b = dets[i].bbox;
-	      
-		      // results_info->confidence[k] = dets[i].prob[j]*100;
-	  	      
-		      left  = (b.x-b.w/2.)*det_img->width;
-		      right = (b.x+b.w/2.)*det_img->width;
-		      top   = (b.y-b.h/2.)*det_img->height;
-		      bot   = (b.y+b.h/2.)*det_img->height;
-	      
-		      if(left < 0) left = 0;
-		      if(right > det_img->width-1) right = det_img->width-1;
-		      if(top < 0) top = 0;
-		      if(bot > det_img->height-1) bot = det_img->height-1;
-
-		      cJSON_AddNumberToObject(region_json, "height", (int)(b.h * det_img->height));
-		      cJSON_AddNumberToObject(region_json, "width", (int)(b.w * det_img->width));
-		      cJSON_AddNumberToObject(region_json, "x", (int)(left));
-		      cJSON_AddNumberToObject(region_json, "y", (int)(top));
-
-		      cJSON_AddItemToArray(regions_array_json, region_json);
-
-		    }
-		  }
-		}
-	      }
-	  }
-      }
-    
-    free_detections(dets, nboxes);
+        dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
 
     return 0;
 }
@@ -212,9 +128,77 @@ double get_wall_time()
     return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }
 
-void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
-	  int frame_skip, char *prefix, char *out_filename, int http_stream_port, int dont_show, int ext_output, const char *json_filename)
+void add_info_to_per_frame_json(char *ptr)
 {
+  cJSON *regions_json = NULL, *regions_array_json = NULL, *region_json = NULL;
+  char tmp_char_buff[128];
+  int i,j, num_labels_detected = 0;
+  int left, right, top, bot;
+  box b;
+  
+  memset(tmp_char_buff, 0, 128);
+  if (ptr != NULL)
+    sprintf(tmp_char_buff, "%s/%08d.jpg", (char *)ptr, local_frame_count);
+  else
+    sprintf(tmp_char_buff, "%08d.jpg", local_frame_count);
+  
+  cJSON_AddItemToObject(per_frame_json, tmp_char_buff, regions_json=cJSON_CreateObject());
+  
+  for(i = 0; i < nboxes; ++i){
+    for(j = 0; j < demo_classes; ++j){
+      if (dets[i].prob[j] > demo_thresh){
+	num_labels_detected += 1;
+      }
+    }
+  }
+  
+  if (num_labels_detected > 0)
+    {
+      
+      regions_array_json = cJSON_AddArrayToObject(regions_json, "regions");
+      
+      for(i = 0; i < nboxes; ++i){
+	for(j = 0; j < demo_classes; ++j){
+	  if (dets[i].prob[j] > demo_thresh){
+	    
+	    region_json = cJSON_CreateObject();
+	    
+	    cJSON_AddStringToObject(region_json, "category", demo_names[j]);
+	    
+	    b = dets[i].bbox;
+	    
+	    // results_info->confidence[k] = dets[i].prob[j]*100;
+	    
+	    left  = (b.x-b.w/2.)*det_img->width;
+	    right = (b.x+b.w/2.)*det_img->width;
+	    top   = (b.y-b.h/2.)*det_img->height;
+	    bot   = (b.y+b.h/2.)*det_img->height;
+	    
+	    if(left < 0) left = 0;
+	    if(right > det_img->width-1) right = det_img->width-1;
+	    if(top < 0) top = 0;
+	    if(bot > det_img->height-1) bot = det_img->height-1;
+	    
+	    cJSON_AddNumberToObject(region_json, "height", (int)(b.h * det_img->height));
+	    cJSON_AddNumberToObject(region_json, "width", (int)(b.w * det_img->width));
+	    cJSON_AddNumberToObject(region_json, "x", (int)(left));
+	    cJSON_AddNumberToObject(region_json, "y", (int)(top));
+	    
+	    cJSON_AddItemToArray(regions_array_json, region_json);
+	    
+	  }
+	}
+      }
+    }
+
+  return;
+  
+}
+
+void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
+    int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, const char *json_filename)
+{
+    in_img = det_img = show_img = NULL;
     //skip = frame_skip;
     image **alphabet = load_alphabet();
     int delay = frame_skip;
@@ -223,6 +207,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     demo_classes = classes;
     demo_thresh = thresh;
     demo_ext_output = ext_output;
+    demo_json_port = json_port;
     printf("Demo\n");
     net = parse_network_cfg_custom(cfgfile, 1);    // set batch=1
     if(weightfile){
@@ -235,20 +220,12 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
     if(filename){
         printf("video file: %s\n", filename);
-//#ifdef CV_VERSION_EPOCH    // OpenCV 2.x
-//        cap = cvCaptureFromFile(filename);
-//#else                    // OpenCV 3.x
         cpp_video_capture = 1;
-        cap = get_capture_video_stream((char *)filename);
-//#endif
+        cap = get_capture_video_stream(filename);
     }else{
         printf("Webcam index: %d\n", cam_index);
-//#ifdef CV_VERSION_EPOCH    // OpenCV 2.x
-//        cap = cvCaptureFromCAM(cam_index);
-//#else                    // OpenCV 3.x
         cpp_video_capture = 1;
         cap = get_capture_webcam(cam_index);
-//#endif
     }
 
     if (!cap) {
@@ -264,10 +241,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     avg = (float *) calloc(l.outputs, sizeof(float));
     for(j = 0; j < FRAMES; ++j) predictions[j] = (float *) calloc(l.outputs, sizeof(float));
     for(j = 0; j < FRAMES; ++j) images[j] = make_image(1,1,3);
-
-    boxes = (box *)calloc(l.w*l.h*l.n, sizeof(box));
-    probs = (float **)calloc(l.w*l.h*l.n, sizeof(float *));
-    for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = (float *)calloc(l.classes, sizeof(float *));
 
     if (l.classes != demo_classes) {
         printf("Parameters don't match: in cfg-file classes=%d, in data-file classes=%d \n", l.classes, demo_classes);
@@ -288,22 +261,14 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     det_s = in_s;
 
     fetch_in_thread(0);
-
-    if(filename)
-      detect_in_thread((void *)filename);
-    else
-      detect_in_thread(0);
-    
+    detect_in_thread(0);
     det_img = in_img;
     det_s = in_s;
 
     for(j = 0; j < FRAMES/2; ++j){
         fetch_in_thread(0);
-	if(filename)
-	  detect_in_thread((void *)filename);
-	else
-	  detect_in_thread(0);
-	det_img = in_img;
+        detect_in_thread(0);
+        det_img = in_img;
         det_s = in_s;
     }
 
@@ -322,8 +287,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         src_fps = get_stream_fps(cap, cpp_video_capture);
 
         //const char* output_name = "test_dnn_out.avi";
-        output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('H', '2', '6', '4'), src_fps, size, 1);
-        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('D', 'I', 'V', 'X'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('H', '2', '6', '4'), src_fps, size, 1);
+        output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('D', 'I', 'V', 'X'), src_fps, size, 1);
         //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'J', 'P', 'G'), src_fps, size, 1);
         //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'P', '4', 'V'), src_fps, size, 1);
         //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'P', '4', '2'), src_fps, size, 1);
@@ -335,17 +300,42 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
     while(1){
         ++local_frame_count;
-        if(1){
+        {
             if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
-	    if(filename)
-	      {
-		if(pthread_create(&detect_thread, 0, detect_in_thread, (void *)filename)) error("Thread creation failed");
-	      }
-	    else
-	      {
-		if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
-	      }
+            if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
+
+            float nms = .45;    // 0.4F
+            int local_nboxes = nboxes;
+            detection *local_dets = dets;
+
+            //if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
+            if (nms) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
+
+#ifndef CLASSIFYAPP
+            printf("\033[2J");
+            printf("\033[1;1H");
+            printf("\nFPS:%.1f\n", fps);
+            printf("Objects:\n\n");
+#else
+	    printf("frame_count: %d letterbox: %d w:%d h:%d\n", local_frame_count, letter_box, det_s.w, det_s.h);
+#endif
+
 	    
+            ++frame_id;
+            /* if (demo_json_port > 0) {
+                int timeout = 200;
+                send_json(local_dets, local_nboxes, l.classes, demo_names, frame_id, demo_json_port, timeout);
+		} */
+
+            draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+
+	    if ((show_img != NULL) && (per_frame_json != NULL))
+	      {
+		add_info_to_per_frame_json((char *)filename);
+	      }
+		
+            free_detections(local_dets, local_nboxes);
+
             if(!prefix){
                 if (!dont_show) {
                     show_image_cv_ipl(show_img, "Demo");
@@ -364,14 +354,12 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             }else{
                 char buff[256];
                 sprintf(buff, "%s_%08d.jpg", prefix, local_frame_count);
-                cvSaveImage(buff, show_img, 0);
-                //save_image(disp, buff);
+                // if(show_img) save_cv_jpg(show_img, buff);
             }
 
-            // if you run it with param -http_port 8090  then open URL in your web-browser: http://localhost:8090
-            if (http_stream_port > 0 && show_img) {
-                //int port = 8090;
-                int port = http_stream_port;
+            // if you run it with param -mjpeg_port 8090  then open URL in your web-browser: http://localhost:8090
+            if (mjpeg_port > 0 && show_img) {
+                int port = mjpeg_port;
                 int timeout = 200;
                 int jpeg_quality = 30;    // 1 - 100
                 send_mjpeg(show_img, port, timeout, jpeg_quality);
@@ -380,7 +368,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             // save video file
             if (output_video_writer && show_img) {
                 cvWriteFrame(output_video_writer, show_img);
-                // printf("\n cvWriteFrame \n");
+                printf("\n cvWriteFrame \n");
             }
 
             cvReleaseImage(&show_img);
@@ -395,25 +383,15 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             }
             det_img = in_img;
             det_s = in_s;
-        }else {
-            fetch_in_thread(0);
-            det_img = in_img;
-            det_s = in_s;
-            detect_in_thread(0);
-
-            show_img = det_img;
-            if (!dont_show) {
-                show_image_cv_ipl(show_img, "Demo");
-                cvWaitKey(1);
-            }
-            cvReleaseImage(&show_img);
         }
         --delay;
         if(delay < 0){
             delay = frame_skip;
 
-            double after = get_wall_time();
-            float curr = 1./(after - before);
+            //double after = get_wall_time();
+            //float curr = 1./(after - before);
+            double after = get_time_point();    // more accurate time measurements
+            float curr = 1000000. / (after - before);
             fps = curr;
             before = after;
         }
@@ -436,7 +414,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 	}
 	cJSON_Delete(per_frame_json);
       }
-    
+
     // free memory
     cvReleaseImage(&show_img);
     cvReleaseImage(&in_img);
@@ -446,12 +424,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     for (j = 0; j < FRAMES; ++j) free(predictions[j]);
     for (j = 0; j < FRAMES; ++j) free_image(images[j]);
 
-    for (j = 0; j < l.w*l.h*l.n; ++j) free(probs[j]);
-    free(boxes);
-    free(probs);
-
-    // free_ptrs((void **)names, net.layers[net.n - 1].classes);
-       
+    // free_ptrs(names, net.layers[net.n - 1].classes);
+    local_frame_count = 0;
+    
     int i;
     const int nsize = 8;
     for (j = 0; j < nsize; ++j) {
@@ -461,14 +436,21 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         free(alphabet[j]);
     }
     free(alphabet);
-
     free_network(net);
-    
+    //cudaProfilerStop();
 }
 
 #ifdef CLASSIFYAPP
-void process_video(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh,
-		   char *output_img_prefix, char *out_filename, int dont_show, const char *json_filename, int http_stream_port, int frame_skip)
+void process_video(struct prep_network_info *prep_netinfo,
+		   char *filename,
+		   float thresh,
+		   float hier_thresh,
+		   char *output_img_prefix,
+		   char *out_filename,
+		   int dont_show,
+		   char *json_filename,
+		   int http_stream_port,
+		   int frame_skip)
 {
 
     pthread_t detect_thread;
@@ -479,14 +461,18 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
     CvVideoWriter* output_video_writer = NULL;    // cv::VideoWriter output_video;
     double before = 0.0;
     int delay = frame_skip;
+
+    in_img = det_img = show_img = NULL;
     
-    demo_names = prep_netinfo->names;
     demo_alphabet = prep_netinfo->alphabet;
+    demo_names = prep_netinfo->names;
     demo_classes = prep_netinfo->classes;
     demo_thresh = thresh;
     // demo_hier = hier_thresh;
     net = prep_netinfo->net;
-    
+    demo_ext_output = 0;
+    demo_json_port = -1;
+
     srand(2222222);
     
     if(filename)
@@ -508,16 +494,12 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
 	error("Couldn't open video file\n");
 	return;
       }
-    
+
     l = net.layers[net.n-1];
 
     avg = (float *) calloc(l.outputs, sizeof(float));
     for(j = 0; j < FRAMES; ++j) predictions[j] = (float *) calloc(l.outputs, sizeof(float));
     for(j = 0; j < FRAMES; ++j) images[j] = make_image(1,1,3);
-
-    boxes = (box *)calloc(l.w*l.h*l.n, sizeof(box));
-    probs = (float **)calloc(l.w*l.h*l.n, sizeof(float *));
-    for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = (float *)calloc(l.classes, sizeof(float *));
 
     if (l.classes != demo_classes) {
       syslog(LOG_ERR, "Parameters don't match: in cfg-file classes=%d, in data-file classes=%d, %s:%d", l.classes, demo_classes, __FILE__, __LINE__);
@@ -532,30 +514,24 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
     fetch_in_thread(0);
     det_img = in_img;
     det_s = in_s;
-    local_frame_count++;
-      
+
     fetch_in_thread(0);
-
-    detect_in_thread((void *)filename);
-
+    detect_in_thread(0);
     det_img = in_img;
     det_s = in_s;
-    local_frame_count++;
-    
+
     for(j = 0; j < FRAMES/2; ++j){
         fetch_in_thread(0);
-	detect_in_thread((void *)filename);
-	det_img = in_img;
+        detect_in_thread(0);
+        det_img = in_img;
         det_s = in_s;
-	local_frame_count++;
     }
 
     if (out_filename && !flag_exit)
     {
         CvSize size;
-        int src_fps = 25;
-
         size.width = det_img->width, size.height = det_img->height;
+        int src_fps = 25;
         src_fps = get_stream_fps(cap, cpp_video_capture);
 
         //const char* output_name = "test_dnn_out.avi";
@@ -569,27 +545,62 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
     }
 
     before = get_wall_time();
-    while(1) {
-      
-        ++local_frame_count;
 
+    while(1){
+      ++local_frame_count;
+      {
 	if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
-	if(pthread_create(&detect_thread, 0, detect_in_thread, (void *)filename)) error("Thread creation failed");
+	if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 	
-	if(output_img_prefix){
+	float nms = .45;    // 0.4F
+	int local_nboxes = nboxes;
+	detection *local_dets = dets;
+	
+	//if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
+	if (nms) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
+	
+	syslog(LOG_INFO, "= frame_count: %d letterbox: %d w:%d h:%d", local_frame_count, letter_box, det_s.w, det_s.h);	
+	
+	++frame_id;
+	/* if (demo_json_port > 0) {
+	   int timeout = 200;
+	   send_json(local_dets, local_nboxes, l.classes, demo_names, frame_id, demo_json_port, timeout);
+	   } */
+	
+	draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+	
+	if ((show_img != NULL) && (per_frame_json != NULL))
+	  add_info_to_per_frame_json((char *)filename);
+	  	
+	free_detections(local_dets, local_nboxes);
+
+	if(!output_img_prefix){
+	  if (!dont_show) {
+	    show_image_cv_ipl(show_img, "Demo");
+	    int c = cvWaitKey(1);
+	    if (c == 10) {
+	      if (frame_skip == 0) frame_skip = 60;
+	      else if (frame_skip == 4) frame_skip = 0;
+	      else if (frame_skip == 60) frame_skip = 4;
+	      else frame_skip = 0;
+	    }
+	    else if (c == 27 || c == 1048603) // ESC - exit (OpenCV 2.x / 3.x)
+	      {
+		flag_exit = 1;
+	      }
+	  }
+	} else {
 	  sprintf(name, "%s_%08d.jpg", output_img_prefix, local_frame_count);
-	  cvSaveImage(name, show_img, 0);
-	  //save_image(disp, buff);
+	  if(show_img) save_cv_jpg(show_img, name);
 	}
 	
-	// if you run it with param -http_port 8090  then open URL in your web-browser: http://localhost:8090
-	if (http_stream_port > 0 && show_img) {
-	  //int port = 8090;
-	  int port = http_stream_port;
+	// if you run it with param -mjpeg_port 8090  then open URL in your web-browser: http://localhost:8090
+	/* if (mjpeg_port > 0 && show_img) {
+	  int port = mjpeg_port;
 	  int timeout = 200;
 	  int jpeg_quality = 30;    // 1 - 100
 	  send_mjpeg(show_img, port, timeout, jpeg_quality);
-	}
+	  } */
 	
 	// save video file
 	if (output_video_writer && show_img) {
@@ -609,34 +620,35 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
 	}
 	det_img = in_img;
 	det_s = in_s;
+      }
+      --delay;
+      if(delay < 0){
+	delay = frame_skip;
 	
+	//double after = get_wall_time();
+	//float curr = 1./(after - before);
+	double after = get_time_point();    // more accurate time measurements
+	float curr = 1000000. / (after - before);
+	fps = curr;
+	before = after;
+      }
 
-	--delay;
-	if(delay < 0){
-	  delay = frame_skip;
-	  
-	  double after = get_wall_time();
-	  float curr = 1./(after - before);
-	  fps = curr;
-	  before = after;
-	}
-	
-	if ((local_frame_count % 100) == 0)
-	  syslog(LOG_INFO, "= For %s, FPS: %0.1f, framecount: %d, %s:%d", filename, fps, local_frame_count+1, __FILE__, __LINE__);
-
+      //if ((local_frame_count % 100) == 0)
+      //syslog(LOG_INFO, "= For %s, FPS: %0.1f, framecount: %d, %s:%d", filename, fps, local_frame_count+1, __FILE__, __LINE__);
+      
     }
     
     syslog(LOG_INFO, "= Input video stream closed. %s:%d", __FILE__, __LINE__);
     if (output_video_writer) {
         cvReleaseVideoWriter(&output_video_writer);
-        syslog(LOG_INFO, "= Output_video_writer closed. %s:%d", __FILE__, __LINE__);
+	syslog(LOG_INFO, "= Output_video_writer closed. %s:%d", __FILE__, __LINE__);
     }
 
     if (json_filename)
       {
 	char *full_json_string = cJSON_Print(per_frame_json);
 	if (full_json_string == NULL) {
-	  syslog(LOG_ERR, "Failed to print per_frame_json. %s:%d", __FILE__, __LINE__);
+	  fprintf(stderr, "Failed to print per_frame_json.\n");
 	} else {
 	  FILE *json_ofp = fopen(json_filename, "w");
 	  fwrite(full_json_string, sizeof(char), strlen(full_json_string), json_ofp);
@@ -644,25 +656,18 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
 	}
 	cJSON_Delete(per_frame_json);
       }
-    
+
     // free memory
     cvReleaseImage(&show_img);
     cvReleaseImage(&in_img);
     free_image(in_s);
-    show_img = NULL;
-    in_img = NULL;
-    det_img = NULL;
     local_frame_count = 0;
     close_stream(cap, cpp_video_capture);
     cap = NULL;
-    
+
     free(avg);
     for (j = 0; j < FRAMES; ++j) free(predictions[j]);
     for (j = 0; j < FRAMES; ++j) free_image(images[j]);
-
-    for (j = 0; j < l.w*l.h*l.n; ++j) free(probs[j]);
-    free(boxes);
-    free(probs);
     
     return;
     
@@ -671,18 +676,9 @@ void process_video(struct prep_network_info *prep_netinfo, char *filename, float
 
 #else
 void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
-	  int frame_skip, char *prefix, char *out_filename, int http_stream_port, int dont_show, int ext_output, char *json_filename)
+    int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output)
 {
-  fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
+    fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
 }
-
-#ifdef CLASSIFYAPP
-void demo_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh,
-		 char *output_img_prefix, char *out_filename, int dont_show, const char *json_filename, int http_stream_port, int frame_skip)
-{
-  fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
-}
-#endif
-  
 #endif
 

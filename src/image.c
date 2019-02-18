@@ -486,6 +486,14 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
 
 #ifdef OPENCV
 
+void save_cv_jpg(IplImage *img, const char *name)
+{
+    IplImage* img_rgb = cvCreateImage(cvSize(img->width, img->height), 8, 3);
+    cvCvtColor(img, img_rgb, CV_RGB2BGR);
+    stbi_write_jpg(name, img_rgb->width, img_rgb->height, 3, (char *)img_rgb->imageData, 80);
+    cvRelease(&img_rgb);
+}
+
 void draw_detections_cv_v3(IplImage* show_img, detection *dets, int num, float thresh, char **names, image **alphabet, int classes, int ext_output)
 {
     int i, j;

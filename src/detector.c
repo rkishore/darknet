@@ -1385,8 +1385,27 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 			       char *outfile,
 			       char *outjson)
 {
-  // process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, (const char *)outjson, 0, 0);
-  demo((char *)get_config()->dnn_config_file,
+  process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0);
+  /* demo((char *)get_config()->dnn_config_file,
+       (char *)get_config()->dnn_weights_file,
+       thresh,
+       hier_thresh,
+       -1, // camindex
+       filename,
+       prep_netinfo->names,
+       prep_netinfo->classes,
+       0, // frame_skip
+       NULL, // prefix
+       outfile, 
+       -1, // mjpeg_port
+       -1, // json_port
+       1, // dont_show
+       0, // ext_output 
+       outjson); 
+  */
+  
+  // With old alexeyab darknet's demo code
+  /* demo((char *)get_config()->dnn_config_file,
        (char *)get_config()->dnn_weights_file,
        thresh,
        hier_thresh,
@@ -1400,8 +1419,9 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
        -1, // http_stream_port
        1, // dont_show
        0, // ext_output
-       outjson);
-
+       NULL); // outjson
+  */
+  
   return;
 }
 
@@ -1435,7 +1455,8 @@ void run_detector(int argc, char **argv)
     int dont_show = find_arg(argc, argv, "-dont_show");
     int show = find_arg(argc, argv, "-show");
     check_mistakes = find_arg(argc, argv, "-check_mistakes");
-    int http_stream_port = find_int_arg(argc, argv, "-http_port", -1);
+    int mjpeg_port = find_int_arg(argc, argv, "-mjpeg_port", -1);
+    int json_port = find_int_arg(argc, argv, "-json_port", -1);
     char *out_filename = find_char_arg(argc, argv, "-out_filename", 0);
     char *outfile = find_char_arg(argc, argv, "-out", 0);
     char *prefix = find_char_arg(argc, argv, "-prefix", 0);
@@ -1504,7 +1525,7 @@ void run_detector(int argc, char **argv)
             if(strlen(filename) > 0)
                 if (filename[strlen(filename) - 1] == 0x0d) filename[strlen(filename) - 1] = 0;
         demo(cfg, weights, thresh, hier_thresh, cam_index, filename, names, classes, frame_skip, prefix, out_filename,
-	     http_stream_port, dont_show, ext_output, out_json_filename);
+	     mjpeg_port, json_port, dont_show, ext_output, out_json_filename);
 
         free_list_contents_kvp(options);
         free_list(options);
