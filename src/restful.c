@@ -799,6 +799,11 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
     cJSON_AddItemToObject(*response_json, "config", config_json=cJSON_CreateObject());
     cJSON_AddNumberToObject(config_json, "detection_threshold", restful_ptr->classifyapp_data->appconfig.detection_threshold);
 
+    if (!strcmp(get_config()->input_mode, "video"))
+      {
+	cJSON_AddNumberToObject(*response_json, "percentage_completed", restful_ptr->cur_classify_info.results_info.percentage_completed);
+      }
+
     if (cur_classify_status == CLASSIFY_STATUS_COMPLETED) {
 
       cJSON_AddStringToObject(*response_json, "status", "finished");
@@ -831,6 +836,10 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 	  
 	  bottom_array_json = cJSON_CreateIntArray((const int *)restful_ptr->cur_classify_info.results_info.bottom, restful_ptr->cur_classify_info.results_info.num_labels_detected);
 	  cJSON_AddItemToObject(results_json, "bottom", bottom_array_json);
+	}
+      else
+	{
+	  cJSON_AddNumberToObject(results_json, "percentage_completed", restful_ptr->cur_classify_info.results_info.percentage_completed);
 	}
       
     } else {

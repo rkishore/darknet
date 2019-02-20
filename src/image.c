@@ -1249,6 +1249,19 @@ int get_stream_fps(CvCapture *cap, int cpp_video_capture)
     }
     return fps;
 }
+
+int get_stream_frame_count(CvCapture *cap, int cpp_video_capture)
+{
+    int frame_count = -1;
+    if (cpp_video_capture) {
+        frame_count = get_stream_frame_count_cpp(cap);
+    }
+    else {
+        frame_count = cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_COUNT);
+    }
+    return frame_count;
+}
+
 #endif  // OPENCV
 
 void save_image_png(image im, const char *name)

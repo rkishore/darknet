@@ -1535,9 +1535,10 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 			       float thresh,
 			       float hier_thresh,
 			       char *outfile,
-			       char *outjson)
+			       char *outjson,
+			       struct detection_results *results_info)
 {
-  process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0);
+  process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
   /* demo((char *)get_config()->dnn_config_file,
        (char *)get_config()->dnn_weights_file,
        thresh,

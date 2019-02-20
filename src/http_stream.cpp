@@ -535,6 +535,23 @@ int get_stream_fps_cpp(CvCapture *cap) {
     }
     return fps;
 }
+
+int get_stream_frame_count_cpp(CvCapture *cap) {
+    int frame_count = -1;
+    try {
+        cv::VideoCapture &cpp_cap = *(cv::VideoCapture *)cap;
+#ifndef CV_VERSION_EPOCH    // OpenCV 3.x
+        frame_count = cpp_cap.get(CAP_PROP_FRAME_COUNT);
+#else                        // OpenCV 2.x
+        frame_count = cpp_cap.get(CV_CAP_PROP_FRAME_COUNT);
+#endif
+    }
+    catch (...) {
+        cerr << " Can't get frame_count of source videofile. For output video FPS = -1 by default. \n";
+    }
+    return frame_count;
+}
+
 // ----------------------------------------
 extern "C" {
     image ipl_to_image(IplImage* src);    // image.c

@@ -31,6 +31,7 @@
 
 #include <syslog.h>
 #include "classifyapp.h"
+#include "restful.h"
 
 image get_image_from_stream(CvCapture *cap);
 
@@ -65,6 +66,7 @@ void save_cv_jpg(IplImage *img, const char *name);
 image get_image_from_stream_resize(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 image get_image_from_stream_letterbox(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 int get_stream_fps(CvCapture *cap, int cpp_video_capture);
+int get_stream_frame_count(CvCapture *cap, int cpp_video_capture);
 // int close_stream(CvCapture *cap, int cpp_video_capture);
 IplImage* in_img;
 IplImage* det_img;
@@ -283,9 +285,10 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     {
         CvSize size;
         size.width = det_img->width, size.height = det_img->height;
-        int src_fps = 25;
+        int src_fps = 25, src_frame_count = -1;
         src_fps = get_stream_fps(cap, cpp_video_capture);
-
+	src_frame_count = get_stream_frame_count(cap, cpp_video_capture);
+	
         //const char* output_name = "test_dnn_out.avi";
         //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('H', '2', '6', '4'), src_fps, size, 1);
         output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('D', 'I', 'V', 'X'), src_fps, size, 1);
@@ -450,7 +453,8 @@ void process_video(struct prep_network_info *prep_netinfo,
 		   int dont_show,
 		   char *json_filename,
 		   int http_stream_port,
-		   int frame_skip)
+		   int frame_skip,
+		   struct detection_results *results_info)
 {
 
     pthread_t detect_thread;
@@ -460,7 +464,7 @@ void process_video(struct prep_network_info *prep_netinfo,
     layer l;
     CvVideoWriter* output_video_writer = NULL;    // cv::VideoWriter output_video;
     double before = 0.0;
-    int delay = frame_skip;
+    int delay = frame_skip, src_frame_count = -1;
 
     in_img = det_img = show_img = NULL;
     
@@ -577,8 +581,9 @@ void process_video(struct prep_network_info *prep_netinfo,
       {
         CvSize size;
         size.width = det_img->width, size.height = det_img->height;
-        int src_fps = 25;
+	int src_fps = 25;
         src_fps = get_stream_fps(cap, cpp_video_capture);
+	src_frame_count = get_stream_frame_count(cap, cpp_video_capture);
 
         //const char* output_name = "test_dnn_out.avi";
         output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('H', '2', '6', '4'), src_fps, size, 1);
@@ -676,6 +681,7 @@ void process_video(struct prep_network_info *prep_netinfo,
 	det_img = in_img;
 	det_s = in_s;
 	++local_frame_count;
+	results_info->percentage_completed = (local_frame_count * 100.0) / src_frame_count;
       }
       --delay;
       if(delay < 0){
@@ -690,7 +696,8 @@ void process_video(struct prep_network_info *prep_netinfo,
       }
 
       if ((local_frame_count % 100) == 0)
-	syslog(LOG_INFO, "= For %s, FPS: %0.1f, framecount: %d, %s:%d", filename, fps, local_frame_count, __FILE__, __LINE__);
+	syslog(LOG_INFO, "= For %s, FPS: %0.1f, framecount: %d/%d, percentage_completed = %0.1f, %s:%d",
+	       filename, fps, local_frame_count, src_frame_count, results_info->percentage_completed, __FILE__, __LINE__);
       
     }
     
@@ -718,6 +725,7 @@ void process_video(struct prep_network_info *prep_netinfo,
     cvReleaseImage(&in_img);
     free_image(in_s);
     local_frame_count = 0;
+    src_frame_count = -1;
     // close_stream(cap, cpp_video_capture);
     // cap = NULL;
 
