@@ -3,11 +3,12 @@
 #include "blas.h"
 #include <stdio.h>
 #include <assert.h>
-#include <syslog.h>
 
 layer make_shortcut_layer(int batch, int index, int w, int h, int c, int w2, int h2, int c2)
 {
-    syslog(LOG_DEBUG,"Shortcut Layer: %d\n", index);
+#ifdef LAYER_DEBUG
+    fprintf(stderr,"Shortcut Layer: %d\n", index);
+#endif
     layer l = {0};
     l.type = SHORTCUT;
     l.batch = batch;
@@ -59,8 +60,17 @@ void resize_shortcut_layer(layer *l, int w, int h)
 
 void forward_shortcut_layer(const layer l, network_state state)
 {
-    copy_cpu(l.outputs*l.batch, state.input, 1, l.output, 1);
-    shortcut_cpu(l.batch, l.w, l.h, l.c, state.net.layers[l.index].output, l.out_w, l.out_h, l.out_c, l.output);
+    if (l.w == l.out_w && l.h == l.out_h && l.c == l.out_c) {
+        int size = l.batch * l.w * l.h * l.c;
+        int i;
+        #pragma omp parallel for
+        for(i = 0; i < size; ++i)
+            l.output[i] = state.input[i] + state.net.layers[l.index].output[i];
+    }
+    else {
+        copy_cpu(l.outputs*l.batch, state.input, 1, l.output, 1);
+        shortcut_cpu(l.batch, l.w, l.h, l.c, state.net.layers[l.index].output, l.out_w, l.out_h, l.out_c, l.output);
+    }
     activate_array(l.output, l.outputs*l.batch, l.activation);
 }
 
@@ -74,8 +84,10 @@ void backward_shortcut_layer(const layer l, network_state state)
 #ifdef GPU
 void forward_shortcut_layer_gpu(const layer l, network_state state)
 {
-    copy_ongpu(l.outputs*l.batch, state.input, 1, l.output_gpu, 1);
-    shortcut_gpu(l.batch, l.w, l.h, l.c, state.net.layers[l.index].output_gpu, l.out_w, l.out_h, l.out_c, l.output_gpu);
+    //copy_ongpu(l.outputs*l.batch, state.input, 1, l.output_gpu, 1);
+    //simple_copy_ongpu(l.outputs*l.batch, state.input, l.output_gpu);
+    //shortcut_gpu(l.batch, l.w, l.h, l.c, state.net.layers[l.index].output_gpu, l.out_w, l.out_h, l.out_c, l.output_gpu);
+    input_shortcut_gpu(state.input, l.batch, l.w, l.h, l.c, state.net.layers[l.index].output_gpu, l.out_w, l.out_h, l.out_c, l.output_gpu);
     activate_array_ongpu(l.output_gpu, l.outputs*l.batch, l.activation);
 }
 

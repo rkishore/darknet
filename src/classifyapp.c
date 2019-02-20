@@ -24,6 +24,7 @@
 #include "restful.h"
 #include "common.h"
 #include "classifyapp.h"
+#include "darknet.h"
 
 #define APP_VERSION_MAJOR    1
 #define APP_VERSION_MINOR    0
@@ -32,7 +33,6 @@
 static restful_comm_struct *restful_struct = NULL;
 static void *restful_dispatch_queue = NULL;
 
-extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
 extern void prepare_detector_custom(struct prep_network_info *prep_netinfo, char *datacfg, char *cfgfile, char *weightfile);
 extern void run_detector_custom(struct prep_network_info *prep_netinfo, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen,
 				struct detection_results *results_info);
@@ -577,7 +577,7 @@ static void *restful_classify_thread_func(void *context)
     else
       {
 
-	syslog(LOG_INFO, "= Detect+classify for %s: %s IN-THE-WORKS, %s:%d",
+	syslog(LOG_INFO, "= Detect+classify for %s: %s, %s:%d",
 	       restful->classifyapp_data->appconfig.input_mode,
 	       restful->classifyapp_data->appconfig.input_filename,
 	       __FILE__, __LINE__);

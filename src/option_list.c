@@ -3,7 +3,6 @@
 #include <string.h>
 #include "option_list.h"
 #include "utils.h"
-#include "data.h"
 
 list *read_data_cfg(char *filename)
 {
@@ -23,12 +22,11 @@ list *read_data_cfg(char *filename)
 		line = NULL;
                 break;
             default:
-                if(!read_option(line, options))
-		  {
-		    fprintf(stderr, "Config file error line %d, could parse: %s\n", nu, line);
-		    free(line);
+                if(!read_option(line, options)){
+                    fprintf(stderr, "Config file error line %d, could parse: %s\n", nu, line);
+                    free(line);
 		    line = NULL;
-		  }
+                }
                 break;
         }
     }

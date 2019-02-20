@@ -5,8 +5,6 @@
 #include <string.h>
 #include <pthread.h>
 #include "option_list.h"
-#include "demo.h"
-#include "network.h"
 
 struct prep_network_info {
   list *options;

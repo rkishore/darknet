@@ -2,11 +2,12 @@
 #include "cuda.h"
 #include "blas.h"
 #include <stdio.h>
-#include <syslog.h>
 
 route_layer make_route_layer(int batch, int n, int *input_layers, int *input_sizes)
 {
-    syslog(LOG_DEBUG,"route ");
+#ifdef LAYER_DEBUG
+    fprintf(stderr,"route ");
+#endif
     route_layer l = {0};
     l.type = ROUTE;
     l.batch = batch;
@@ -16,9 +17,14 @@ route_layer make_route_layer(int batch, int n, int *input_layers, int *input_siz
     int i;
     int outputs = 0;
     for(i = 0; i < n; ++i){
-        syslog(LOG_DEBUG," %d", input_layers[i]);
+#ifdef LAYER_DEBUG
+        fprintf(stderr," %d", input_layers[i]);
+#endif
         outputs += input_sizes[i];
     }
+#ifdef LAYER_DEBUG
+    fprintf(stderr, "\n");
+#endif
     l.outputs = outputs;
     l.inputs = outputs;
     l.delta =  calloc(outputs*batch, sizeof(float));
@@ -67,7 +73,7 @@ void resize_route_layer(route_layer *l, network *net)
     l->output_gpu  = cuda_make_array(l->output, l->outputs*l->batch);
     l->delta_gpu   = cuda_make_array(l->delta,  l->outputs*l->batch);
 #endif
-    
+
 }
 
 void forward_route_layer(const route_layer l, network_state state)
@@ -110,7 +116,8 @@ void forward_route_layer_gpu(const route_layer l, network_state state)
         float *input = state.net.layers[index].output_gpu;
         int input_size = l.input_sizes[i];
         for(j = 0; j < l.batch; ++j){
-            copy_ongpu(input_size, input + j*input_size, 1, l.output_gpu + offset + j*l.outputs, 1);
+            //copy_ongpu(input_size, input + j*input_size, 1, l.output_gpu + offset + j*l.outputs, 1);
+            simple_copy_ongpu(input_size, input + j*input_size, l.output_gpu + offset + j*l.outputs);
         }
         offset += input_size;
     }

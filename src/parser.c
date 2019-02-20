@@ -18,6 +18,7 @@
 #include "gru_layer.h"
 #include "list.h"
 #include "local_layer.h"
+#include "lstm_layer.h"
 #include "maxpool_layer.h"
 #include "normalization_layer.h"
 #include "option_list.h"
@@ -59,6 +60,7 @@ LAYER_TYPE string_to_layer_type(char * type)
             || strcmp(type, "[network]")==0) return NETWORK;
     if (strcmp(type, "[crnn]")==0) return CRNN;
     if (strcmp(type, "[gru]")==0) return GRU;
+    if (strcmp(type, "[lstm]")==0) return LSTM;
     if (strcmp(type, "[rnn]")==0) return RNN;
     if (strcmp(type, "[conn]")==0
             || strcmp(type, "[connected]")==0) return CONNECTED;
@@ -166,7 +168,7 @@ convolutional_layer parse_convolutional(list *options, size_params params)
     int xnor = option_find_int_quiet(options, "xnor", 0);
     int use_bin_output = option_find_int_quiet(options, "bin_output", 0);
 
-    convolutional_layer layer = make_convolutional_layer(batch,h,w,c,n,size,stride,padding,activation, batch_normalize, binary, xnor, params.net.adam, use_bin_output);
+    convolutional_layer layer = make_convolutional_layer(batch,1,h,w,c,n,size,stride,padding,activation, batch_normalize, binary, xnor, params.net.adam, use_bin_output, params.index);
     layer.flipped = option_find_int_quiet(options, "flipped", 0);
     layer.dot = option_find_float_quiet(options, "dot", 0);
 
@@ -181,13 +183,17 @@ convolutional_layer parse_convolutional(list *options, size_params params)
 
 layer parse_crnn(list *options, size_params params)
 {
-    int output_filters = option_find_int(options, "output_filters",1);
-    int hidden_filters = option_find_int(options, "hidden_filters",1);
+    int size = option_find_int_quiet(options, "size", 3);
+    int stride = option_find_int_quiet(options, "stride", 1);
+    int pad = option_find_int_quiet(options, "pad", 1);
+
+    int output_filters = option_find_int(options, "output",1);
+    int hidden_filters = option_find_int(options, "hidden",1);
     char *activation_s = option_find_str(options, "activation", "logistic");
     ACTIVATION activation = get_activation(activation_s);
     int batch_normalize = option_find_int_quiet(options, "batch_normalize", 0);
 
-    layer l = make_crnn_layer(params.batch, params.w, params.h, params.c, hidden_filters, output_filters, params.time_steps, activation, batch_normalize);
+    layer l = make_crnn_layer(params.batch, params.w, params.h, params.c, hidden_filters, output_filters, params.time_steps, size, stride, pad, activation, batch_normalize);
 
     l.shortcut = option_find_int_quiet(options, "shortcut", 0);
 
@@ -220,6 +226,16 @@ layer parse_gru(list *options, size_params params)
     return l;
 }
 
+layer parse_lstm(list *options, size_params params)
+{
+    int output = option_find_int(options, "output",1);
+    int batch_normalize = option_find_int_quiet(options, "batch_normalize", 0);
+
+    layer l = make_lstm_layer(params.batch, params.inputs, output, params.time_steps, batch_normalize);
+
+    return l;
+}
+
 connected_layer parse_connected(list *options, size_params params)
 {
     int output = option_find_int(options, "output",1);
@@ -227,7 +243,7 @@ connected_layer parse_connected(list *options, size_params params)
     ACTIVATION activation = get_activation(activation_s);
     int batch_normalize = option_find_int_quiet(options, "batch_normalize", 0);
 
-    connected_layer layer = make_connected_layer(params.batch, params.inputs, output, activation, batch_normalize);
+    connected_layer layer = make_connected_layer(params.batch, 1, params.inputs, output, activation, batch_normalize);
 
     return layer;
 }
@@ -656,7 +672,13 @@ void parse_net_options(list *options, network *net)
     net->policy = get_policy(policy_s);
     net->burn_in = option_find_int_quiet(options, "burn_in", 0);
 #ifdef CUDNN_HALF
-    net->burn_in = 0;
+    if (net->gpu_index >= 0) {
+        int compute_capability = get_gpu_compute_capability(net->gpu_index);
+        if (get_gpu_compute_capability(net->gpu_index) >= 700) net->cudnn_half = 1;
+        else net->cudnn_half = 0;
+        fprintf(stderr, " compute_capability = %d, cudnn_half = %d \n", compute_capability, net->cudnn_half);
+    }
+    else fprintf(stderr, " GPU isn't used \n");
 #endif
     if(net->policy == STEP){
         net->step = option_find_int(options, "step", 1);
@@ -704,10 +726,10 @@ int is_network(section *s)
 
 network parse_network_cfg(char *filename)
 {
-    return parse_network_cfg_custom(filename, 0);
+    return parse_network_cfg_custom(filename, 0, 0);
 }
 
-network parse_network_cfg_custom(char *filename, int batch)
+network parse_network_cfg_custom(char *filename, int batch, int time_steps)
 {
     list *sections = read_cfg(filename);
     node *n = sections->front;
@@ -726,19 +748,22 @@ network parse_network_cfg_custom(char *filename, int batch)
     params.c = net.c;
     params.inputs = net.inputs;
     if (batch > 0) net.batch = batch;
+    if (time_steps > 0) net.time_steps = time_steps;
     params.batch = net.batch;
     params.time_steps = net.time_steps;
     params.net = net;
 
     float bflops = 0;
     size_t workspace_size = 0;
+    size_t max_inputs = 0;
+    size_t max_outputs = 0;
     n = n->next;
     int count = 0;
     free_section(s);
-    syslog(LOG_DEBUG, "layer     filters    size              input                output");
+    // fprintf(stderr, "layer     filters    size              input                output\n");
     while(n){
         params.index = count;
-        syslog(LOG_DEBUG, "%4d ", count);
+        //fprintf(stderr, "%4d ", count);
         s = (section *)n->val;
         options = s->options;
         layer l = {0};
@@ -753,6 +778,8 @@ network parse_network_cfg_custom(char *filename, int batch)
             l = parse_rnn(options, params);
         }else if(lt == GRU){
             l = parse_gru(options, params);
+        }else if(lt == LSTM){
+            l = parse_lstm(options, params);
         }else if(lt == CRNN){
             l = parse_crnn(options, params);
         }else if(lt == CONNECTED){
@@ -784,10 +811,14 @@ network parse_network_cfg_custom(char *filename, int batch)
             l = parse_avgpool(options, params);
         }else if(lt == ROUTE){
             l = parse_route(options, params, net);
+            int k;
+            for (k = 0; k < l.n; ++k) net.layers[l.input_layers[k]].use_bin_output = 0;
         }else if (lt == UPSAMPLE) {
             l = parse_upsample(options, params, net);
         }else if(lt == SHORTCUT){
             l = parse_shortcut(options, params, net);
+            net.layers[count - 1].use_bin_output = 0;
+            net.layers[l.index].use_bin_output = 0;
         }else if(lt == DROPOUT){
             l = parse_dropout(options, params);
             l.output = net.layers[count-1].output;
@@ -803,9 +834,12 @@ network parse_network_cfg_custom(char *filename, int batch)
         l.stopbackward = option_find_int_quiet(options, "stopbackward", 0);
         l.dontload = option_find_int_quiet(options, "dontload", 0);
         l.dontloadscales = option_find_int_quiet(options, "dontloadscales", 0);
+        l.learning_rate_scale = option_find_float_quiet(options, "learning_rate", 1);
         option_unused(options);
         net.layers[count] = l;
         if (l.workspace_size > workspace_size) workspace_size = l.workspace_size;
+        if (l.inputs > max_inputs) max_inputs = l.inputs;
+        if (l.outputs > max_outputs) max_outputs = l.outputs;
         free_section(s);
         n = n->next;
         ++count;
@@ -820,21 +854,41 @@ network parse_network_cfg_custom(char *filename, int batch)
     free_list(sections);
     net.outputs = get_network_output_size(net);
     net.output = get_network_output(net);
-    syslog(LOG_DEBUG, "Total BFLOPS %5.3f", bflops);
-    if(workspace_size){
-        //printf("%ld\n", workspace_size);
+    // fprintf(stderr, "Total BFLOPS %5.3f \n", bflops);
 #ifdef GPU
-        if(gpu_index >= 0){
-            net.workspace = cuda_make_array(0, workspace_size/sizeof(float) + 1);
-            int size = get_network_input_size(net) * net.batch;
-            net.input_state_gpu = cuda_make_array(0, size);
-        }else {
+    get_cuda_stream();
+    get_cuda_memcpy_stream();
+    if (gpu_index >= 0)
+    {
+        int size = get_network_input_size(net) * net.batch;
+        net.input_state_gpu = cuda_make_array(0, size);
+        if (cudaSuccess == cudaHostAlloc(&net.input_pinned_cpu, size * sizeof(float), cudaHostRegisterMapped)) net.input_pinned_cpu_flag = 1;
+        else {
+            cudaGetLastError(); // reset CUDA-error
+            net.input_pinned_cpu = calloc(size, sizeof(float));
+        }
+
+        // pre-allocate memory for inference on Tensor Cores (fp16)
+        if (net.cudnn_half) {
+            *net.max_input16_size = max_inputs;
+            CHECK_CUDA(cudaMalloc((void **)net.input16_gpu, *net.max_input16_size * sizeof(short))); //sizeof(half)
+            *net.max_output16_size = max_outputs;
+            CHECK_CUDA(cudaMalloc((void **)net.output16_gpu, *net.max_output16_size * sizeof(short))); //sizeof(half)
+        }
+        if (workspace_size) {
+	  // fprintf(stderr, " Allocate additional workspace_size = %1.2f MB \n", (float)workspace_size/1000000);
+            net.workspace = cuda_make_array(0, workspace_size / sizeof(float) + 1);
+        }
+        else {
             net.workspace = calloc(1, workspace_size);
         }
-#else
-        net.workspace = calloc(1, workspace_size);
-#endif
     }
+#else
+        if (workspace_size) {
+            net.workspace = calloc(1, workspace_size);
+        }
+#endif
+
     LAYER_TYPE lt = net.layers[net.n - 1].type;
     if ((net.w % 32 != 0 || net.h % 32 != 0) && (lt == YOLO || lt == REGION || lt == DETECTION)) {
         printf("\n Warning: width=%d and height=%d in cfg-file must be divisible by 32 for default networks Yolo v1/v2/v3!!! \n\n",
@@ -972,7 +1026,7 @@ void save_weights_upto(network net, char *filename, int cutoff)
         cuda_set_device(net.gpu_index);
     }
 #endif
-    syslog(LOG_DEBUG, "Saving weights to %s\n", filename);
+    fprintf(stderr, "Saving weights to %s\n", filename);
     FILE *fp = fopen(filename, "wb");
     if(!fp) file_error(filename);
 
@@ -1004,6 +1058,15 @@ void save_weights_upto(network net, char *filename, int cutoff)
             save_connected_weights(*(l.state_z_layer), fp);
             save_connected_weights(*(l.state_r_layer), fp);
             save_connected_weights(*(l.state_h_layer), fp);
+        } if(l.type == LSTM){
+            save_connected_weights(*(l.wf), fp);
+            save_connected_weights(*(l.wi), fp);
+            save_connected_weights(*(l.wg), fp);
+            save_connected_weights(*(l.wo), fp);
+            save_connected_weights(*(l.uf), fp);
+            save_connected_weights(*(l.ui), fp);
+            save_connected_weights(*(l.ug), fp);
+            save_connected_weights(*(l.uo), fp);
         } if(l.type == CRNN){
             save_convolutional_weights(*(l.input_layer), fp);
             save_convolutional_weights(*(l.self_layer), fp);
@@ -1114,6 +1177,7 @@ void load_convolutional_weights(layer l, FILE *fp)
     }
     int num = l.n*l.c*l.size*l.size;
     fread(l.biases, sizeof(float), l.n, fp);
+    //fread(l.weights, sizeof(float), num, fp); // as in connected layer
     if (l.batch_normalize && (!l.dontloadscales)){
         fread(l.scales, sizeof(float), l.n, fp);
         fread(l.rolling_mean, sizeof(float), l.n, fp);
@@ -1159,7 +1223,7 @@ void load_weights_upto(network *net, char *filename, int cutoff)
         cuda_set_device(net->gpu_index);
     }
 #endif
-    syslog(LOG_DEBUG, "= Loading weights from %s...", filename);
+    syslog(LOG_INFO, "= Loading weights from %s...", filename);
     fflush(stdout);
     FILE *fp = fopen(filename, "rb");
     if(!fp) file_error(filename);
@@ -1171,14 +1235,16 @@ void load_weights_upto(network *net, char *filename, int cutoff)
     fread(&minor, sizeof(int), 1, fp);
     fread(&revision, sizeof(int), 1, fp);
     if ((major * 10 + minor) >= 2) {
-        syslog(LOG_DEBUG, "seen 64");
+        // printf("\n seen 64 \n");
         uint64_t iseen = 0;
         fread(&iseen, sizeof(uint64_t), 1, fp);
         *net->seen = iseen;
     }
     else {
-        syslog(LOG_DEBUG, "seen 32");
-        fread(net->seen, sizeof(int), 1, fp);
+        printf("\n seen 32 \n");
+        uint32_t iseen = 0;
+        fread(&iseen, sizeof(uint32_t), 1, fp);
+        *net->seen = iseen;
     }
     int transpose = (major > 1000) || (minor > 1000);
 
@@ -1213,6 +1279,16 @@ void load_weights_upto(network *net, char *filename, int cutoff)
             load_connected_weights(*(l.state_r_layer), fp, transpose);
             load_connected_weights(*(l.state_h_layer), fp, transpose);
         }
+        if(l.type == LSTM){
+            load_connected_weights(*(l.wf), fp, transpose);
+            load_connected_weights(*(l.wi), fp, transpose);
+            load_connected_weights(*(l.wg), fp, transpose);
+            load_connected_weights(*(l.wo), fp, transpose);
+            load_connected_weights(*(l.uf), fp, transpose);
+            load_connected_weights(*(l.ui), fp, transpose);
+            load_connected_weights(*(l.ug), fp, transpose);
+            load_connected_weights(*(l.uo), fp, transpose);
+        }
         if(l.type == LOCAL){
             int locations = l.out_w*l.out_h;
             int size = l.size*l.size*l.c*l.n*locations;
@@ -1225,7 +1301,8 @@ void load_weights_upto(network *net, char *filename, int cutoff)
 #endif
         }
     }
-    syslog(LOG_INFO, "= Loaded network and weights successfully");
+    // fprintf(stderr, "Done!\n");
+    syslog(LOG_INFO, "= Done loading network and weights, %s:%d", __FILE__, __LINE__);
     fclose(fp);
 }
 
@@ -1234,3 +1311,28 @@ void load_weights(network *net, char *filename)
     load_weights_upto(net, filename, net->n);
 }
 
+// load network & force - set batch size
+network *load_network_custom(char *cfg, char *weights, int clear, int batch)
+{
+    printf(" Try to load cfg: %s, weights: %s, clear = %d \n", cfg, weights, clear);
+    network *net = calloc(1, sizeof(network));
+    *net = parse_network_cfg_custom(cfg, batch, 0);
+    if (weights && weights[0] != 0) {
+        load_weights(net, weights);
+    }
+    if (clear) (*net->seen) = 0;
+    return net;
+}
+
+// load network & get batch size from cfg-file
+network *load_network(char *cfg, char *weights, int clear)
+{
+    printf(" Try to load cfg: %s, weights: %s, clear = %d \n", cfg, weights, clear);
+    network *net = calloc(1, sizeof(network));
+    *net = parse_network_cfg(cfg);
+    if (weights && weights[0] != 0) {
+        load_weights(net, weights);
+    }
+    if (clear) (*net->seen) = 0;
+    return net;
+}

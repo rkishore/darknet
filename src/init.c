@@ -27,6 +27,7 @@
 #include "common.h"
 
 #include "cuda.h"
+#include "darknet.h"
 
 static void 
 verify_license()

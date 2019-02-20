@@ -616,11 +616,25 @@ void scale_array(float *a, int n, float s)
 int sample_array(float *a, int n)
 {
     float sum = sum_array(a, n);
-    scale_array(a, n, 1./sum);
+    scale_array(a, n, 1. / sum);
     float r = rand_uniform(0, 1);
     int i;
-    for(i = 0; i < n; ++i){
+    for (i = 0; i < n; ++i) {
         r = r - a[i];
+        if (r <= 0) return i;
+    }
+    return n - 1;
+}
+
+int sample_array_custom(float *a, int n)
+{
+    float sum = sum_array(a, n);
+    scale_array(a, n, 1./sum);
+    float r = rand_uniform(0, 1);
+    int start_index = rand_int(0, 0);
+    int i;
+    for(i = 0; i < n; ++i){
+        r = r - a[(i + start_index) % n];
         if (r <= 0) return i;
     }
     return n-1;
@@ -639,6 +653,31 @@ int max_index(float *a, int n)
     }
     return max_i;
 }
+
+int top_max_index(float *a, int n, int k)
+{
+    float *values = calloc(k, sizeof(float));
+    int *indexes = calloc(k, sizeof(int));
+    if (n <= 0) return -1;
+    int i, j;
+    for (i = 0; i < n; ++i) {
+        for (j = 0; j < k; ++j) {
+            if (a[i] > values[j]) {
+                values[j] = a[i];
+                indexes[j] = i;
+                break;
+            }
+        }
+    }
+    int count = 0;
+    for (j = 0; j < k; ++j) if (values[j] > 0) count++;
+    int get_index = rand_int(0, count-1);
+    int val = indexes[get_index];
+    free(indexes);
+    free(values);
+    return val;
+}
+
 
 int int_index(int *a, int val, int n)
 {

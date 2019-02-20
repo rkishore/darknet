@@ -1,6 +1,7 @@
-#include "cuda_runtime.h"
-#include "curand.h"
-#include "cublas_v2.h"
+//#include "cuda_runtime.h"
+//#include "curand.h"
+//#include "cublas_v2.h"
+#include "cuda.h"
 
 extern "C" {
 #include <stdio.h>
@@ -58,10 +59,10 @@ void forward_network_gpu(network net, network_state state)
         if(l.delta_gpu && state.train){
             fill_ongpu(l.outputs * l.batch, 0, l.delta_gpu, 1);
         }
-        //printf("%d - type: %d - ", i, l.type);
+        //printf("\n layer %d - type: %d - \n", i, l.type);
         //start_timer();
         l.forward_gpu(l, state);
-        //cudaDeviceSynchronize();
+        //CHECK_CUDA(cudaDeviceSynchronize());
         //stop_timer_and_show();
 
         if(net.wait_stream)
@@ -87,6 +88,7 @@ void forward_network_gpu(network net, network_state state)
         }
 */
     }
+    //cudaStreamSynchronize(get_cuda_stream());   // sync CUDA-functions
     //cudaDeviceSynchronize();
     //show_total_time();
 }
@@ -151,7 +153,10 @@ void forward_backward_network_gpu(network net, float *x, float *y)
     int i;
     for (i = 0; i < net.n; ++i) {
         layer l = net.layers[i];
-        cuda_convert_f32_to_f16(l.weights_gpu, l.c*l.n*l.size*l.size, l.weights_gpu16);
+        if (l.weights_gpu && l.weights_gpu16) {
+            assert((l.c*l.n*l.size*l.size) > 0);
+            cuda_convert_f32_to_f16(l.weights_gpu, l.c*l.n*l.size*l.size, l.weights_gpu16);
+        }
     }
 #endif
     forward_network_gpu(net, state);
@@ -444,7 +449,8 @@ float *network_predict_gpu(network net, float *input)
     state.net = net;
     //state.input = cuda_make_array(input, size);   // memory will be allocated in the parse_network_cfg_custom()
     state.input = net.input_state_gpu;
-    cuda_push_array(state.input, input, size);
+    memcpy(net.input_pinned_cpu, input, size * sizeof(float));
+    cuda_push_array(state.input, net.input_pinned_cpu, size);
     state.truth = 0;
     state.train = 0;
     state.delta = 0;

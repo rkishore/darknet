@@ -65,7 +65,7 @@ void save_cv_jpg(IplImage *img, const char *name);
 image get_image_from_stream_resize(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 image get_image_from_stream_letterbox(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 int get_stream_fps(CvCapture *cap, int cpp_video_capture);
-int close_stream(CvCapture *cap, int cpp_video_capture);
+// int close_stream(CvCapture *cap, int cpp_video_capture);
 IplImage* in_img;
 IplImage* det_img;
 IplImage* show_img;
@@ -109,7 +109,7 @@ void *detect_in_thread(void *ptr)
 
     ipl_images[demo_index] = det_img;
     det_img = ipl_images[(demo_index + FRAMES / 2 + 1) % FRAMES];
-    demo_index = (demo_index + 1) % FRAMES;
+    demo_index = (demo_index + 1) % FRAMES; // takes values between 0-2 as FRAMES = 3
 
     if (letter_box)
         dets = get_network_boxes(&net, in_img->width, in_img->height, demo_thresh, demo_thresh, 0, 1, &nboxes, 1); // letter box
@@ -209,7 +209,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     demo_ext_output = ext_output;
     demo_json_port = json_port;
     printf("Demo\n");
-    net = parse_network_cfg_custom(cfgfile, 1);    // set batch=1
+    net = parse_network_cfg_custom(cfgfile, 1, 0);    // set batch=1
     if(weightfile){
         load_weights(&net, weightfile);
     }
@@ -511,20 +511,315 @@ void process_video(struct prep_network_info *prep_netinfo,
 
     flag_exit = 0;
 
+    // Fetch image/frame 0
+    fetch_in_thread(0);
+    det_img = in_img; // initialized
+    det_s = in_s; // initialized
+
+    // Detect in image/frame 1, dets and nboxes initialized
+    /* detect_in_thread(0);
+    do_nms_sort(dets, nboxes, l.classes, 0.45);
+    draw_detections_cv_v3(show_img, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+    if ((show_img != NULL) && (per_frame_json != NULL))
+      add_info_to_per_frame_json((char *)filename);
+    free_detections(dets, nboxes);
+    */
+    syslog(LOG_DEBUG, "= frame_count: %d letterbox: %d w:%d h:%d nboxes: %d dets: %p show_img: %p det_img: %p in_img: %p",
+	   local_frame_count, letter_box, det_s.w, det_s.h, nboxes, dets, show_img, det_img, in_img);	
+    local_frame_count += 1;
+
+    // Fetch image/frame 1
+    fetch_in_thread(0); 
+
+    // Fetch image/frame 1, dets and nboxes initialized - we miss frame 0
+    detect_in_thread(0);
+    det_img = in_img; // updated
+    det_s = in_s; // updated
+    free_detections(dets, nboxes); // for valgrind
+    
+    /* do_nms_sort(dets, nboxes, l.classes, 0.45);
+    draw_detections_cv_v3(show_img, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+    if ((show_img != NULL) && (per_frame_json != NULL))
+      add_info_to_per_frame_json((char *)filename);
+    free_detections(dets, nboxes);
+    if (output_video_writer && show_img) {
+      cvWriteFrame(output_video_writer, show_img);
+      // printf("\n cvWriteFrame \n");
+    }
+    */
+    syslog(LOG_DEBUG, "= frame_count: %d letterbox: %d w:%d h:%d nboxes: %d dets: %p show_img: %p det_img: %p in_img: %p",
+	   local_frame_count, letter_box, det_s.w, det_s.h, nboxes, dets, show_img, det_img, in_img);	
+    local_frame_count += 1;
+
+    for(j = 0; j < FRAMES/2; ++j){
+        fetch_in_thread(0); // frame 2
+        detect_in_thread(0); // dets and nboxes updated - keep this as this is what will get worked upon first
+        det_img = in_img;
+        det_s = in_s;
+	/* 
+	do_nms_sort(dets, nboxes, l.classes, 0.45);
+	draw_detections_cv_v3(show_img, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+	if ((show_img != NULL) && (per_frame_json != NULL))
+	  add_info_to_per_frame_json((char *)filename);
+	free_detections(dets, nboxes);
+	if (output_video_writer && show_img) {
+	  cvWriteFrame(output_video_writer, show_img);
+	  // printf("\n cvWriteFrame \n");
+	}
+	*/
+	syslog(LOG_DEBUG, "= frame_count: %d letterbox: %d w:%d h:%d nboxes: %d dets: %p show_img: %p det_img: %p in_img: %p",
+	       local_frame_count, letter_box, det_s.w, det_s.h, nboxes, dets, show_img, det_img, in_img);
+	local_frame_count += 1;	
+
+    }
+
+    if (out_filename && !flag_exit)
+      {
+        CvSize size;
+        size.width = det_img->width, size.height = det_img->height;
+        int src_fps = 25;
+        src_fps = get_stream_fps(cap, cpp_video_capture);
+
+        //const char* output_name = "test_dnn_out.avi";
+        output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('H', '2', '6', '4'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('D', 'I', 'V', 'X'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'J', 'P', 'G'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'P', '4', 'V'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'P', '4', '2'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('X', 'V', 'I', 'D'), src_fps, size, 1);
+        //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('W', 'M', 'V', '2'), src_fps, size, 1);
+      }
+
+
+    before = get_wall_time();
+
+    while(1){
+      {
+	//if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
+	//if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");	
+	
+	float nms = .45;    // 0.4F
+	int local_nboxes = nboxes;
+	detection *local_dets = dets;
+	
+	//if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
+	if (nms) do_nms_sort(local_dets, local_nboxes, l.classes, nms); // work on dets, nboxes for frame 2 to begin with
+	
+	syslog(LOG_DEBUG, "= frame_count: %d letterbox: %d w:%d h:%d nboxes: %d dets: %p show_img: %p det_img: %p in_img: %p",
+	       local_frame_count, letter_box, det_s.w, det_s.h, local_nboxes, local_dets,
+	       show_img, det_img, in_img);	
+	
+	++frame_id;
+	/* if (demo_json_port > 0) {
+	   int timeout = 200;
+	   send_json(local_dets, local_nboxes, l.classes, demo_names, frame_id, demo_json_port, timeout);
+	   } */
+	
+	draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+	
+	if ((show_img != NULL) && (per_frame_json != NULL))
+	  add_info_to_per_frame_json((char *)filename);
+	  	
+	free_detections(local_dets, local_nboxes); // dets, boxes freed
+	local_dets = NULL;
+	local_nboxes = 0;
+	dets = local_dets;
+	nboxes = local_nboxes;
+	
+	if(!output_img_prefix){
+	  if (!dont_show) {
+	    show_image_cv_ipl(show_img, "Demo");
+	    int c = cvWaitKey(1);
+	    if (c == 10) {
+	      if (frame_skip == 0) frame_skip = 60;
+	      else if (frame_skip == 4) frame_skip = 0;
+	      else if (frame_skip == 60) frame_skip = 4;
+	      else frame_skip = 0;
+	    }
+	    else if (c == 27 || c == 1048603) // ESC - exit (OpenCV 2.x / 3.x)
+	      {
+		flag_exit = 1;
+	      }
+	  }
+	} else {
+	  sprintf(name, "%s_%08d.jpg", output_img_prefix, local_frame_count);
+	  if(show_img) save_cv_jpg(show_img, name);
+	}
+	
+	// if you run it with param -mjpeg_port 8090  then open URL in your web-browser: http://localhost:8090
+	/* if (mjpeg_port > 0 && show_img) {
+	  int port = mjpeg_port;
+	  int timeout = 200;
+	  int jpeg_quality = 30;    // 1 - 100
+	  send_mjpeg(show_img, port, timeout, jpeg_quality);
+	  } */
+	
+	// save video file
+	if (output_video_writer && show_img) {
+	  cvWriteFrame(output_video_writer, show_img);
+	  // printf("\n cvWriteFrame \n");
+	}
+	
+	cvReleaseImage(&show_img);
+
+	if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
+	if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");	
+
+	pthread_join(fetch_thread, 0);
+	pthread_join(detect_thread, 0); // dets and nboxes updated for frame 3
+		
+	if (flag_exit == 1) break;
+	
+	if(delay == 0){
+	  show_img = det_img;
+	}
+	det_img = in_img;
+	det_s = in_s;
+	++local_frame_count;
+      }
+      --delay;
+      if(delay < 0){
+	delay = frame_skip;
+	
+	//double after = get_wall_time();
+	//float curr = 1./(after - before);
+	double after = get_time_point();    // more accurate time measurements
+	float curr = 1000000. / (after - before);
+	fps = curr;
+	before = after;
+      }
+
+      if ((local_frame_count % 100) == 0)
+	syslog(LOG_INFO, "= For %s, FPS: %0.1f, framecount: %d, %s:%d", filename, fps, local_frame_count, __FILE__, __LINE__);
+      
+    }
+    
+    syslog(LOG_INFO, "= Input video stream closed. %s:%d", __FILE__, __LINE__);
+    if (output_video_writer) {
+        cvReleaseVideoWriter(&output_video_writer);
+	syslog(LOG_INFO, "= Output_video_writer closed. %s:%d", __FILE__, __LINE__);
+    }
+
+    if (json_filename)
+      {
+	char *full_json_string = cJSON_Print(per_frame_json);
+	if (full_json_string == NULL) {
+	  fprintf(stderr, "Failed to print per_frame_json.\n");
+	} else {
+	  FILE *json_ofp = fopen(json_filename, "w");
+	  fwrite(full_json_string, sizeof(char), strlen(full_json_string), json_ofp);
+	  fclose(json_ofp);
+	}
+	cJSON_Delete(per_frame_json);
+      }
+
+    // free memory
+    cvReleaseImage(&show_img);
+    cvReleaseImage(&in_img);
+    free_image(in_s);
+    local_frame_count = 0;
+    // close_stream(cap, cpp_video_capture);
+    // cap = NULL;
+
+    free(avg);
+    for (j = 0; j < FRAMES; ++j) free(predictions[j]);
+    for (j = 0; j < FRAMES; ++j) free_image(images[j]);
+    
+    return;
+    
+}
+
+void process_video_old(struct prep_network_info *prep_netinfo,
+		       char *filename,
+		       float thresh,
+		       float hier_thresh,
+		       char *output_img_prefix,
+		       char *out_filename,
+		       int dont_show,
+		       char *json_filename,
+		       int http_stream_port,
+		       int frame_skip)
+{
+
+    pthread_t detect_thread;
+    pthread_t fetch_thread;
+    int j;
+    char name[256];
+    layer l;
+    CvVideoWriter* output_video_writer = NULL;    // cv::VideoWriter output_video;
+    double before = 0.0;
+    int delay = frame_skip;
+
+    in_img = det_img = show_img = NULL;
+    
+    demo_alphabet = prep_netinfo->alphabet;
+    demo_names = prep_netinfo->names;
+    demo_classes = prep_netinfo->classes;
+    demo_thresh = thresh;
+    // demo_hier = hier_thresh;
+    net = prep_netinfo->net;
+    demo_ext_output = 0;
+    demo_json_port = -1;
+
+    srand(2222222);
+    
+    if(filename)
+      {
+	syslog(LOG_INFO, "= Processing input video file: %s, %s:%d", filename, __FILE__, __LINE__);
+        cpp_video_capture = 1;
+        cap = get_capture_video_stream(filename);
+      }
+    else
+      {
+	syslog(LOG_ERR, "= No input video file specified, %s:%d", __FILE__, __LINE__);
+	error("No filename specified\n");
+	return;
+      }
+
+    if (!cap)
+      {
+	syslog(LOG_ERR, "= Could not open input video file: %s, %s:%d", filename, __FILE__, __LINE__);
+	error("Couldn't open video file\n");
+	return;
+      }
+
+    l = net.layers[net.n-1];
+
+    avg = (float *) calloc(l.outputs, sizeof(float));
+    for(j = 0; j < FRAMES; ++j) predictions[j] = (float *) calloc(l.outputs, sizeof(float));
+    for(j = 0; j < FRAMES; ++j) images[j] = make_image(1,1,3);
+
+    if (l.classes != demo_classes) {
+      syslog(LOG_ERR, "Parameters don't match: in cfg-file classes=%d, in data-file classes=%d, %s:%d", l.classes, demo_classes, __FILE__, __LINE__);
+      return;
+    }
+
+    if (json_filename)
+      per_frame_json = cJSON_CreateObject();
+
+    flag_exit = 0;
+
+    // Fetch image/frame 1
     fetch_in_thread(0);
     det_img = in_img;
     det_s = in_s;
-
-    fetch_in_thread(0);
+    
+    // Fetch image/frame 2, dets and nboxes changes
+    fetch_in_thread(0); 
+    // Fetch image/frame 2
     detect_in_thread(0);
     det_img = in_img;
     det_s = in_s;
+    syslog(LOG_INFO, "= frame_count: %d letterbox: %d w:%d h:%d nboxes: %d",
+	   local_frame_count, letter_box, det_s.w, det_s.h, nboxes);	
 
     for(j = 0; j < FRAMES/2; ++j){
         fetch_in_thread(0);
         detect_in_thread(0);
         det_img = in_img;
         det_s = in_s;
+	syslog(LOG_INFO, "= frame_count: %d letterbox: %d w:%d h:%d nboxes: %d",
+	       local_frame_count, letter_box, det_s.w, det_s.h, nboxes);
     }
 
     if (out_filename && !flag_exit)
@@ -543,15 +838,14 @@ void process_video(struct prep_network_info *prep_netinfo,
         //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('X', 'V', 'I', 'D'), src_fps, size, 1);
         //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('W', 'M', 'V', '2'), src_fps, size, 1);
     }
-
+    
     before = get_wall_time();
 
     while(1){
       ++local_frame_count;
       {
-	if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
-	if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
-	
+	//if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
+	//if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");	
 	float nms = .45;    // 0.4F
 	int local_nboxes = nboxes;
 	detection *local_dets = dets;
@@ -559,7 +853,8 @@ void process_video(struct prep_network_info *prep_netinfo,
 	//if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
 	if (nms) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
 	
-	syslog(LOG_INFO, "= frame_count: %d letterbox: %d w:%d h:%d", local_frame_count, letter_box, det_s.w, det_s.h);	
+	syslog(LOG_INFO, "= frame_count: %d letterbox: %d w:%d h:%d nboxes: %d",
+	       local_frame_count, letter_box, det_s.w, det_s.h, local_nboxes);	
 	
 	++frame_id;
 	/* if (demo_json_port > 0) {
@@ -609,7 +904,10 @@ void process_video(struct prep_network_info *prep_netinfo,
 	}
 	
 	cvReleaseImage(&show_img);
-	
+
+	if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
+	if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");	
+
 	pthread_join(fetch_thread, 0);
 	pthread_join(detect_thread, 0);
 	
@@ -662,8 +960,8 @@ void process_video(struct prep_network_info *prep_netinfo,
     cvReleaseImage(&in_img);
     free_image(in_s);
     local_frame_count = 0;
-    close_stream(cap, cpp_video_capture);
-    cap = NULL;
+    // close_stream(cap, cpp_video_capture);
+    // cap = NULL;
 
     free(avg);
     for (j = 0; j < FRAMES; ++j) free(predictions[j]);

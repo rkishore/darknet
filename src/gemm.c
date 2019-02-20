@@ -487,6 +487,15 @@ void transpose_bin(uint32_t *A, uint32_t *B, const int n, const int m,
         }
     }
 }
+
+static inline int popcnt_32(uint32_t val32) {
+#ifdef WIN32  // Windows MSVS
+    int tmp_count = __popcnt(val32);
+#else   // Linux GCC
+    int tmp_count = __builtin_popcount(val32);
+#endif
+    return tmp_count;
+}
 //----------------------------
 
 
@@ -721,6 +730,206 @@ void gemm_nn(int M, int N, int K, float ALPHA,
 }
 
 
+#define TILE_M 4    // 4 ops
+#define TILE_N 16   // AVX2 = 2 ops * 8 floats
+#define TILE_K 16   // loop
+
+void gemm_nn_fast(int M, int N, int K, float ALPHA,
+    float *A, int lda,
+    float *B, int ldb,
+    float *C, int ldc)
+{
+    int i;
+
+    #pragma omp parallel for
+    for (i = 0; i < (M / TILE_M)*TILE_M; i += TILE_M)
+    {
+        int j, k;
+        int i_d, j_d, k_d;
+
+        for (k = 0; k < (K / TILE_K)*TILE_K; k += TILE_K)
+        {
+            for (j = 0; j < (N / TILE_N)*TILE_N; j += TILE_N)
+            {
+                // L1 - 6 bits tag [11:6] - cache size 32 KB, conflict for each 4 KB
+                // L2 - 9 bits tag [14:6] - cache size 256 KB, conflict for each 32 KB
+                // L3 - 13 bits tag [18:6] - cache size 8 MB, conflict for each 512 KB
+
+                __m256 result256;
+                __m256 a256_0, b256_0;    // AVX
+                __m256 a256_1, b256_1;    // AVX
+                __m256 a256_2, b256_2;    // AVX
+                __m256 a256_3, b256_3;    // AVX
+                __m256 c256_0, c256_1, c256_2, c256_3;
+                __m256 c256_4, c256_5, c256_6, c256_7;
+
+                c256_0 = _mm256_loadu_ps(&C[(0 + i)*ldc + (0 + j)]);
+                c256_1 = _mm256_loadu_ps(&C[(1 + i)*ldc + (0 + j)]);
+                c256_2 = _mm256_loadu_ps(&C[(0 + i)*ldc + (8 + j)]);
+                c256_3 = _mm256_loadu_ps(&C[(1 + i)*ldc + (8 + j)]);
+
+                c256_4 = _mm256_loadu_ps(&C[(2 + i)*ldc + (0 + j)]);
+                c256_5 = _mm256_loadu_ps(&C[(3 + i)*ldc + (0 + j)]);
+                c256_6 = _mm256_loadu_ps(&C[(2 + i)*ldc + (8 + j)]);
+                c256_7 = _mm256_loadu_ps(&C[(3 + i)*ldc + (8 + j)]);
+
+
+                for (k_d = 0; k_d < (TILE_K); ++k_d)
+                {
+                    a256_0 = _mm256_set1_ps(ALPHA*A[(0 + i)*lda + (k_d + k)]);
+                    a256_1 = _mm256_set1_ps(ALPHA*A[(1 + i)*lda + (k_d + k)]);
+
+                    a256_2 = _mm256_set1_ps(ALPHA*A[(2 + i)*lda + (k_d + k)]);
+                    a256_3 = _mm256_set1_ps(ALPHA*A[(3 + i)*lda + (k_d + k)]);
+
+
+                    b256_0 = _mm256_loadu_ps(&B[(k_d + k)*ldb + (0 + j)]);
+                    b256_1 = _mm256_loadu_ps(&B[(k_d + k)*ldb + (8 + j)]);
+
+                    // FMA - Intel Haswell (2013), AMD Piledriver (2012)
+                    //c256_0 = _mm256_fmadd_ps(a256_0, b256_0, c256_0);
+                    //c256_1 = _mm256_fmadd_ps(a256_1, b256_0, c256_1);
+                    //c256_2 = _mm256_fmadd_ps(a256_0, b256_1, c256_2);
+                    //c256_3 = _mm256_fmadd_ps(a256_1, b256_1, c256_3);
+
+                    //c256_4 = _mm256_fmadd_ps(a256_2, b256_0, c256_4);
+                    //c256_5 = _mm256_fmadd_ps(a256_3, b256_0, c256_5);
+                    //c256_6 = _mm256_fmadd_ps(a256_2, b256_1, c256_6);
+                    //c256_7 = _mm256_fmadd_ps(a256_3, b256_1, c256_7);
+
+                    result256 = _mm256_mul_ps(a256_0, b256_0);
+                    c256_0 = _mm256_add_ps(result256, c256_0);
+
+                    result256 = _mm256_mul_ps(a256_1, b256_0);
+                    c256_1 = _mm256_add_ps(result256, c256_1);
+
+                    result256 = _mm256_mul_ps(a256_0, b256_1);
+                    c256_2 = _mm256_add_ps(result256, c256_2);
+
+                    result256 = _mm256_mul_ps(a256_1, b256_1);
+                    c256_3 = _mm256_add_ps(result256, c256_3);
+
+
+                    result256 = _mm256_mul_ps(a256_2, b256_0);
+                    c256_4 = _mm256_add_ps(result256, c256_4);
+
+                    result256 = _mm256_mul_ps(a256_3, b256_0);
+                    c256_5 = _mm256_add_ps(result256, c256_5);
+
+                    result256 = _mm256_mul_ps(a256_2, b256_1);
+                    c256_6 = _mm256_add_ps(result256, c256_6);
+
+                    result256 = _mm256_mul_ps(a256_3, b256_1);
+                    c256_7 = _mm256_add_ps(result256, c256_7);
+                }
+                _mm256_storeu_ps(&C[(0 + i)*ldc + (0 + j)], c256_0);
+                _mm256_storeu_ps(&C[(1 + i)*ldc + (0 + j)], c256_1);
+                _mm256_storeu_ps(&C[(0 + i)*ldc + (8 + j)], c256_2);
+                _mm256_storeu_ps(&C[(1 + i)*ldc + (8 + j)], c256_3);
+
+                _mm256_storeu_ps(&C[(2 + i)*ldc + (0 + j)], c256_4);
+                _mm256_storeu_ps(&C[(3 + i)*ldc + (0 + j)], c256_5);
+                _mm256_storeu_ps(&C[(2 + i)*ldc + (8 + j)], c256_6);
+                _mm256_storeu_ps(&C[(3 + i)*ldc + (8 + j)], c256_7);
+            }
+
+            for (j = (N / TILE_N)*TILE_N; j < N; ++j) {
+                for (i_d = i; i_d < (i + TILE_M); ++i_d)
+                {
+                    for (k_d = k; k_d < (k + TILE_K); ++k_d)
+                    {
+                        register float A_PART = ALPHA*A[i_d*lda + k_d];
+                        C[i_d*ldc + j] += A_PART*B[k_d*ldb + j];
+                    }
+                }
+            }
+        }
+
+        for (k = (K / TILE_K)*TILE_K; k < K; ++k)
+        {
+            for (i_d = i; i_d < (i + TILE_M); ++i_d)
+            {
+                register float A_PART = ALPHA*A[i_d*lda + k];
+                for (j = 0; j < N; ++j) {
+                    C[i_d*ldc + j] += A_PART*B[k*ldb + j];
+                }
+            }
+        }
+    }
+
+    for (i = (M / TILE_M)*TILE_M; i < M; ++i) {
+        int j, k;
+        for (k = 0; k < K; ++k) {
+            register float A_PART = ALPHA*A[i*lda + k];
+            for (j = 0; j < N; ++j) {
+                C[i*ldc + j] += A_PART*B[k*ldb + j];
+            }
+        }
+    }
+}
+
+
+
+void gemm_nn_bin_32bit_packed(int M, int N, int K, float ALPHA,
+    uint32_t *A, int lda,
+    uint32_t *B, int ldb,
+    float *C, int ldc, float *mean_arr)
+{
+    int i;
+    #pragma omp parallel for
+    for (i = 0; i < M; ++i) {   // l.n
+        int j, s;
+        float mean_val = mean_arr[i];
+        //printf(" l.mean_arr[i] = %d \n ", l.mean_arr[i]);
+        for (s = 0; s < K; ++s) // l.size*l.size*l.c/32  or (l.size*l.size*l.c)
+        {
+            register uint32_t A_PART = A[i*lda + s];
+            __m256i a256 = _mm256_set1_epi32(A_PART);
+
+            for (j = 0; j < N - 8; j += 8)
+            {
+                __m256i b256 = *((__m256i*)&B[s*ldb + j]);
+                __m256i xor256 = _mm256_xor_si256(a256, b256);  // xnor = xor(a,b)
+                __m256i all_1 = _mm256_set1_epi8(255);
+                __m256i xnor256 = _mm256_andnot_si256(xor256, all_1); // xnor = not(xor(a,b))
+
+                // waiting for - CPUID Flags: AVX512VPOPCNTDQ: __m512i _mm512_popcnt_epi32(__m512i a)
+                __m256 count = _mm256_setr_ps(
+                    popcnt_32(_mm256_extract_epi32(xnor256, 0)),
+                    popcnt_32(_mm256_extract_epi32(xnor256, 1)),
+                    popcnt_32(_mm256_extract_epi32(xnor256, 2)),
+                    popcnt_32(_mm256_extract_epi32(xnor256, 3)),
+                    popcnt_32(_mm256_extract_epi32(xnor256, 4)),
+                    popcnt_32(_mm256_extract_epi32(xnor256, 5)),
+                    popcnt_32(_mm256_extract_epi32(xnor256, 6)),
+                    popcnt_32(_mm256_extract_epi32(xnor256, 7)));
+
+                __m256 val2 = _mm256_set1_ps(2);
+                count = _mm256_mul_ps(count, val2);     // count * 2
+
+                __m256 val32 = _mm256_set1_ps(32);
+                count = _mm256_sub_ps(count, val32);    // count - 32
+
+                __m256 mean256 = _mm256_set1_ps(mean_val);
+                count = _mm256_mul_ps(count, mean256);  // count * mean_val
+
+                __m256 c256 = *((__m256*)&C[i*ldc + j]);
+                count = _mm256_add_ps(count, c256);     // c = c + count
+                *((__m256*)&C[i*ldc + j]) = count;
+            }
+
+            for (; j < N; ++j) // out_h*out_w;
+            {
+                register uint32_t B_PART = B[s*ldb + j];
+                uint32_t xnor_result = ~(A_PART ^ B_PART);
+                int32_t count = popcnt_32(xnor_result);  // must be Signed int
+
+                C[i*ldc + j] += (2 * count - 32) * mean_val;
+            }
+        }
+    }
+}
+
 void convolution_2d_old(int w, int h, int ksize, int n, int c, int pad, int stride,
     float *weights, float *input, float *output)
 {
@@ -942,6 +1151,23 @@ static inline int popcnt256_custom(__m256i n) {
         + _mm256_extract_epi64(val, 3);
 }
 
+static inline void xnor_avx2_popcnt(__m256i a_bit256, __m256i b_bit256, __m256i *count_sum) {
+    __m256i c_bit256 = _mm256_set1_epi8(255);
+
+    __m256i xor256 = _mm256_xor_si256(a_bit256, b_bit256);  // xnor = not(xor(a,b))
+    c_bit256 = _mm256_andnot_si256(xor256, c_bit256);  // can be optimized - we can do other NOT for wegihts once and do not do this NOT
+
+    *count_sum = _mm256_add_epi64(count256(c_bit256), *count_sum);    //  1st part - popcnt Mula’s algorithm
+}
+
+// 2nd part - popcnt Mula’s algorithm
+static inline int get_count_mula(__m256i count_sum) {
+    return _mm256_extract_epi64(count_sum, 0)
+        + _mm256_extract_epi64(count_sum, 1)
+        + _mm256_extract_epi64(count_sum, 2)
+        + _mm256_extract_epi64(count_sum, 3);
+}
+
 // 5x times faster than gemm()-float32
 // further optimizations: do mean-mult only for the last layer
 void gemm_nn_custom_bin_mean_transposed(int M, int N, int K, float ALPHA_UNUSED,
@@ -959,45 +1185,101 @@ void gemm_nn_custom_bin_mean_transposed(int M, int N, int K, float ALPHA_UNUSED,
     }
 #endif
 
+    //#pragma omp parallel for
+    //for (i = 0; i < M; ++i)
     #pragma omp parallel for
-    for (i = 0; i < M; ++i)
+    for (i = 0; i < (M/2)*2; i += 2)
     {   // l.n - filters [16 - 55 - 1024]
-        float mean_val = mean_arr[i];
+        float mean_val_0 = mean_arr[i + 0];
+        float mean_val_1 = mean_arr[i + 1];
         int j, k;
         __m256i all_1 = _mm256_set1_epi8(255);
 
-        for (j = 0; j < N; ++j) { // out_h*out_w - one channel output size [169 - 173056]
-            int count = 0;
+        //for (j = 0; j < N; ++j)
+        for (j = 0; j < (N/2)*2; j += 2)
+        { // out_h*out_w - one channel output size [169 - 173056]
+            //int count = 0;
             const int bit_step = 256;
-            __m256i count_sum = _mm256_set1_epi8(0);
+            __m256i count_sum_0 = _mm256_set1_epi8(0);
+            __m256i count_sum_1 = _mm256_set1_epi8(0);
+            __m256i count_sum_2 = _mm256_set1_epi8(0);
+            __m256i count_sum_3 = _mm256_set1_epi8(0);
 
             for (k = 0; k < K; k += bit_step) {   // l.size*l.size*l.c - one filter size [27 - 9216]
-                __m256i a_bit256 = _mm256_loadu_si256((__m256i *)(A + (i*lda + k) / 8));
-                __m256i b_bit256 = _mm256_loadu_si256((__m256i *)(B + (j*ldb + k) / 8));
-                __m256i xor256 = _mm256_xor_si256(a_bit256, b_bit256);  // xnor = not(xor(a,b))
-                __m256i c_bit256 = _mm256_andnot_si256(xor256, all_1);  // can be optimized - we can do other NOT for wegihts once and do not do this NOT
 
-                count_sum = _mm256_add_epi64(count256(c_bit256), count_sum);    //  Mula’s algorithm
+                __m256i a_bit256_0 = _mm256_loadu_si256((__m256i *)(A + ((i + 0)*lda + k) / 8));
+                __m256i b_bit256_0 = _mm256_loadu_si256((__m256i *)(B + ((j + 0)*ldb + k) / 8));
+
+                __m256i a_bit256_1 = _mm256_loadu_si256((__m256i *)(A + ((i + 1)*lda + k) / 8));
+                __m256i b_bit256_1 = _mm256_loadu_si256((__m256i *)(B + ((j + 1)*ldb + k) / 8));
+
+
+                xnor_avx2_popcnt(a_bit256_0, b_bit256_0, &count_sum_0);
+                xnor_avx2_popcnt(a_bit256_0, b_bit256_1, &count_sum_1);
+
+                xnor_avx2_popcnt(a_bit256_1, b_bit256_0, &count_sum_2);
+                xnor_avx2_popcnt(a_bit256_1, b_bit256_1, &count_sum_3);
 
                 //count += popcnt256(c_bit256);
-
                 //binary_int64_printf(c_bit64);
                 //printf(", count = %d \n\n", tmp_count);
             }
 
-            // count of 1 bits
-            //count = count_sum.m256i_i64[0] +
-            //    count_sum.m256i_i64[1] +
-            //    count_sum.m256i_i64[2] +
-             //   count_sum.m256i_i64[3];
-            count = _mm256_extract_epi64(count_sum, 0)
-                + _mm256_extract_epi64(count_sum, 1)
-                + _mm256_extract_epi64(count_sum, 2)
-                + _mm256_extract_epi64(count_sum, 3);
+            int count_0 = get_count_mula(count_sum_0);
+            int count_1 = get_count_mula(count_sum_1);
+            int count_2 = get_count_mula(count_sum_2);
+            int count_3 = get_count_mula(count_sum_3);
 
-            int f1 = (K % bit_step == 0) ? 0 : (bit_step - (K % bit_step));
+            const int f1 = (K % bit_step == 0) ? 0 : (bit_step - (K % bit_step));
+            count_0 = count_0 - f1;    // remove extra bits (from empty space for align only)
+            count_1 = count_1 - f1;
+            count_2 = count_2 - f1;
+            count_3 = count_3 - f1;
+            C[i*ldc + (j + 0)] = (2 * count_0 - K) * mean_val_0;
+            C[i*ldc + (j + 1)] = (2 * count_1 - K) * mean_val_0;
+            C[(i + 1)*ldc + (j + 0)] = (2 * count_2 - K) * mean_val_1;
+            C[(i + 1)*ldc + (j + 1)] = (2 * count_3 - K) * mean_val_1;
+        }
+
+        int i_d;
+        for (i_d = 0; i_d < 2; ++i_d)
+        {
+            float mean_val = mean_arr[i + i_d];
+            for (j = (N / 2) * 2; j < N; j += 1)
+            { // out_h*out_w - one channel output size [169 - 173056]
+                const int bit_step = 256;
+                __m256i count_sum = _mm256_set1_epi8(0);
+
+                for (k = 0; k < K; k += bit_step) {   // l.size*l.size*l.c - one filter size [27 - 9216]
+                    __m256i a_bit256_0 = _mm256_loadu_si256((__m256i *)(A + ((i + i_d + 0)*lda + k) / 8));
+                    __m256i b_bit256_0 = _mm256_loadu_si256((__m256i *)(B + ((j + 0)*ldb + k) / 8));
+                    xnor_avx2_popcnt(a_bit256_0, b_bit256_0, &count_sum);
+                }
+                int count = get_count_mula(count_sum);
+                const int f1 = (K % bit_step == 0) ? 0 : (bit_step - (K % bit_step));
+                count = count - f1;    // remove extra bits (from empty space for align only)
+                C[(i + i_d)*ldc + j] = (2 * count - K) * mean_val;
+            }
+        }
+    }
+
+    for (i = (M / 2) * 2; i < M; i += 1)
+    {
+        float mean_val = mean_arr[i];
+        int j, k;
+        for (j = 0; j < N; j += 1)
+        { // out_h*out_w - one channel output size [169 - 173056]
+            const int bit_step = 256;
+            __m256i count_sum = _mm256_set1_epi8(0);
+
+            for (k = 0; k < K; k += bit_step) {   // l.size*l.size*l.c - one filter size [27 - 9216]
+                __m256i a_bit256_0 = _mm256_loadu_si256((__m256i *)(A + ((i + 0)*lda + k) / 8));
+                __m256i b_bit256_0 = _mm256_loadu_si256((__m256i *)(B + ((j + 0)*ldb + k) / 8));
+                xnor_avx2_popcnt(a_bit256_0, b_bit256_0, &count_sum);
+            }
+            int count = get_count_mula(count_sum);
+            const int f1 = (K % bit_step == 0) ? 0 : (bit_step - (K % bit_step));
             count = count - f1;    // remove extra bits (from empty space for align only)
-
             C[i*ldc + j] = (2 * count - K) * mean_val;
         }
     }
@@ -1652,7 +1934,15 @@ void forward_maxpool_layer_avx(float *src, float *dst, int *indexes, int size, i
     }
 }
 
-#else
+#else   // AVX
+
+int is_avx() {
+    return 0;
+}
+
+int is_fma_avx2() {
+    return 0;
+}
 
 void gemm_nn(int M, int N, int K, float ALPHA,
     float *A, int lda,
@@ -1665,6 +1955,53 @@ void gemm_nn(int M, int N, int K, float ALPHA,
             register float A_PART = ALPHA*A[i*lda + k];
             for (j = 0; j < N; ++j) {
                 C[i*ldc + j] += A_PART*B[k*ldb + j];
+            }
+        }
+    }
+}
+
+void gemm_nn_fast(int M, int N, int K, float ALPHA,
+    float *A, int lda,
+    float *B, int ldb,
+    float *C, int ldc)
+{
+    int i, j, k;
+    #pragma omp parallel for
+    for (i = 0; i < M; ++i) {
+        for (k = 0; k < K; ++k) {
+            register float A_PART = ALPHA*A[i*lda + k];
+            for (j = 0; j < N; ++j) {
+                C[i*ldc + j] += A_PART*B[k*ldb + j];
+            }
+        }
+    }
+}
+
+void gemm_nn_bin_32bit_packed(int M, int N, int K, float ALPHA,
+    uint32_t *A, int lda,
+    uint32_t *B, int ldb,
+    float *C, int ldc, float *mean_arr)
+{
+    int i;
+    #pragma omp parallel for
+    for (i = 0; i < M; ++i) {   // l.n
+        int j, s;
+        float mean_val = mean_arr[i];
+        //printf(" l.mean_arr[i] = %d \n ", l.mean_arr[i]);
+        for (s = 0; s < K; ++s) // l.size*l.size*l.c/32  or (l.size*l.size*l.c)
+        {
+            //register float A_PART = 1*a[i*k + s];
+            register uint32_t A_PART = A[i*lda + s];
+            for (j = 0; j < N; ++j) // out_h*out_w;
+            {
+                //c[i*n + j] += A_PART*b[s*n + j];
+                register uint32_t B_PART = B[s*ldb + j];
+                uint32_t xnor_result = ~(A_PART ^ B_PART);
+                //printf(" xnor_result = %d, ", xnor_result);
+                int32_t count = popcnt_32(xnor_result);  // must be Signed int
+
+                C[i*ldc + j] += (2 * count - 32) * mean_val;
+                //c[i*n + j] += count*mean;
             }
         }
     }
@@ -1728,11 +2065,11 @@ static inline int popcnt_64(uint64_t val64) {
     tmp_count += __popcnt(val64 >> 32);
 #endif
 #else   // Linux
-#ifdef __x86_64__  // Linux 64-bit
+#if defined(__x86_64__) || defined(__aarch64__)  // Linux 64-bit
     int tmp_count = __builtin_popcountll(val64);
 #else  // Linux 32-bit
     int tmp_count = __builtin_popcount(val64);
-    tmp_count += __builtin_popcount(val64);
+    tmp_count += __builtin_popcount(val64 >> 32);
 #endif
 #endif
     return tmp_count;
@@ -2102,6 +2439,137 @@ void forward_maxpool_layer_avx(float *src, float *dst, int *indexes, int size, i
 
 #endif    // AVX
 
+
+// 32 channels -> 1 channel (with 32 floats)
+// 256 channels -> 8 channels (with 32 floats)
+void repack_input(float *input, float *re_packed_input, int w, int h, int c)
+{
+    const int items_per_channel = w * h;
+    int chan, i;
+    for (chan = 0; chan < c; chan += 32)
+    {
+        for (i = 0; i < items_per_channel; ++i)
+        {
+            int c_pack;
+            for (c_pack = 0; c_pack < 32; ++c_pack) {
+                float src = input[(chan + c_pack)*items_per_channel + i];
+
+                re_packed_input[chan*items_per_channel + i * 32 + c_pack] = src;
+            }
+        }
+    }
+}
+
+void transpose_uint32(uint32_t *src, uint32_t *dst, int src_h, int src_w, int src_align, int dst_align)
+{
+    //l.bit_align - algined (n) by 32
+    //new_ldb - aligned (k) by 256
+
+    int i;
+    //#pragma omp parallel for
+    for (i = 0; i < src_h; i += 1)  // l.size*l.size*l.c;
+    {
+        int j;
+        for (j = 0; j < src_w; j += 1)  // out_h*out_w;
+        {
+            ((uint32_t *)dst)[j*dst_align / 32 + i] = ((uint32_t *)src)[i*src_align + j];
+        }
+    }
+}
+
+void gemm_nn_bin_transposed_32bit_packed(int M, int N, int K, float ALPHA,
+    uint32_t *A, int lda,
+    uint32_t *B, int ldb,
+    float *C, int ldc, float *mean_arr)
+{
+    int i;
+    #pragma omp parallel for
+    for (i = 0; i < M; ++i) {   // l.n
+        int j, s;
+        float mean_val = mean_arr[i];
+        for (j = 0; j < N; ++j) // out_h*out_w;
+        {
+            float val = 0;
+            for (s = 0; s < K; ++s) // l.size*l.size*l.c/32  or (l.size*l.size*l.c)
+            {
+                register uint32_t A_PART = ((uint32_t*)A)[i*lda + s];
+                register uint32_t B_PART = ((uint32_t*)B)[j*ldb + s];
+                uint32_t xnor_result = ~(A_PART ^ B_PART);
+                int32_t count = popcnt_32(xnor_result);  // must be Signed int
+
+                val += (2 * count - 32) * mean_val;
+            }
+            C[i*ldc + j] += val;
+        }
+    }
+}
+
+void convolution_repacked(uint32_t *packed_input, uint32_t *packed_weights, float *output,
+    int w, int h, int c, int n, int size, int pad, int new_lda, float *mean_arr)
+{
+    int fil;
+    // filter index
+    #pragma omp parallel for
+    for (fil = 0; fil < n; ++fil) {
+        float mean_val = mean_arr[fil];
+        int chan, c_pack, y, x, f_y, f_x;
+        // channel index
+        for (chan = 0; chan < c / 32; ++chan)
+            //for (chan = 0; chan < l.c; chan += 32)
+            //for (c_pack = 0; c_pack < 32; ++c_pack)
+            // input - y
+            for (y = 0; y < h; ++y)
+                // input - x
+                for (x = 0; x < w; ++x)
+                {
+                    int const output_index = fil*w*h + y*w + x;
+                    float sum = 0;
+
+                    // filter - y
+                    for (f_y = 0; f_y < size; ++f_y)
+                    {
+                        int input_y = y + f_y - pad;
+                        // filter - x
+                        for (f_x = 0; f_x < size; ++f_x)
+                        {
+                            int input_x = x + f_x - pad;
+                            if (input_y < 0 || input_x < 0 || input_y >= h || input_x >= w) continue;
+
+                            // normal
+                            //float input = state.input[(chan + c_pack)*l.w*l.h + input_y*l.w + input_x];
+                            //float weight = l.weights[fil*l.c*l.size*l.size + (chan + c_pack)*l.size*l.size + f_y*l.size + f_x];
+
+                            // packed
+                            //float input = re_packed_input[chan*l.w*l.h + (input_y*l.w + input_x) * 32 + c_pack];
+                            //float weight = l.weights[fil*l.c*l.size*l.size + chan*l.size*l.size + (f_y*l.size + f_x) * 32 + c_pack];
+                            //sum += input * weight;
+
+                            //float input = re_packed_input[chan*l.w*l.h + (input_y*l.w + input_x) * 32 + c_pack];
+                            //float weight = l.weights[fil*l.c*l.size*l.size + chan*l.size*l.size + (f_y*l.size + f_x) * 32 + c_pack];
+                            //uint32_t bit1 = input > 0;
+                            //uint32_t bit2 = weight > 0;
+                            //uint32_t count = (~(bit1 ^ bit2)) & 1;
+                            //float result = (2 * (float)count - 1) * mean_val;
+                            //printf("\n mul = %f, bit1 = %d, bit2 = %d, count = %d, mean = %f, result = %f  ", input*weight, bit1, bit2, count, mean_val, result);
+                            //sum += result;
+
+                            uint32_t input = ((uint32_t *)packed_input)[chan*w*h + input_y*w + input_x];
+                            //uint32_t weight = ((uint32_t *)l.align_bit_weights)[fil*l.c*l.size*l.size/32 + chan*l.size*l.size + f_y*l.size + f_x];
+                            uint32_t weight = ((uint32_t *)packed_weights)[fil*new_lda / 32 + chan*size*size + f_y*size + f_x];
+
+                            uint32_t xnor_result = ~(input ^ weight);
+                            int32_t count = popcnt_32(xnor_result); // mandatory Signed int
+                            sum += (2 * count - 32) * mean_val;
+                        }
+                    }
+                    // l.output[filters][width][height] +=
+                    //        state.input[channels][width][height] *
+                    //        l.weights[filters][channels][filter_width][filter_height];
+                    output[output_index] += sum;
+                }
+    }
+}
+
 void gemm_nt(int M, int N, int K, float ALPHA,
         float *A, int lda,
         float *B, int ldb,
@@ -2169,17 +2637,23 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         }
     }
 
-    int t;
-    #pragma omp parallel for
-    for (t = 0; t < M; ++t) {
-        if (!TA && !TB)
-            gemm_nn(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
-        else if (TA && !TB)
-            gemm_tn(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
-        else if (!TA && TB)
-            gemm_nt(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
-        else
-            gemm_tt(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
+    is_avx();   // initialize static variable
+    if (is_fma_avx2() && !TA && !TB) {
+        gemm_nn_fast(M, N, K, ALPHA, A, lda, B, ldb, C, ldc);
+    }
+    else {
+        int t;
+        #pragma omp parallel for
+        for (t = 0; t < M; ++t) {
+            if (!TA && !TB)
+                gemm_nn(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+            else if (TA && !TB)
+                gemm_tn(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
+            else if (!TA && TB)
+                gemm_nt(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+            else
+                gemm_tt(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
+        }
     }
 }
 
@@ -2195,9 +2669,10 @@ void gemm_ongpu(int TA, int TB, int M, int N, int K, float ALPHA,
 {
     cublasHandle_t handle = blas_handle();
     cudaError_t stream_status = cublasSetStream(handle, get_cuda_stream());
+    CHECK_CUDA(stream_status);
     cudaError_t status = cublasSgemm(handle, (TB ? CUBLAS_OP_T : CUBLAS_OP_N),
             (TA ? CUBLAS_OP_T : CUBLAS_OP_N), N, M, K, &ALPHA, B_gpu, ldb, A_gpu, lda, &BETA, C_gpu, ldc);
-    check_error(status);
+    CHECK_CUDA(status);
 }
 
 void gemm_gpu(int TA, int TB, int M, int N, int K, float ALPHA,
