@@ -786,9 +786,9 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
   cur_classify_status = restful_ptr->cur_classify_info.classify_status;
   pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);
   
-  cJSON_AddNumberToObject(*response_json, "id", restful_ptr->cur_classify_info.classify_id);
-
   if (restful_ptr->cur_classify_info.classify_id >= 0) {
+
+    cJSON_AddNumberToObject(*response_json, "id", restful_ptr->cur_classify_info.classify_id);
 
     cJSON_AddStringToObject(*response_json, "input", get_config()->image_url);
     cJSON_AddStringToObject(*response_json, "output_dir", get_config()->output_directory);
@@ -882,8 +882,10 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 
   } else {
 
+    cJSON_AddNumberToObject(*response_json, "id", 1);  
     cJSON_AddStringToObject(*response_json, "status", "idle");
-
+    cJSON_AddStringToObject(*response_json, "input", "None");
+    
   }
 
   return;
