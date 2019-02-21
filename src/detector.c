@@ -1538,7 +1538,44 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 			       char *outjson,
 			       struct detection_results *results_info)
 {
-  process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
+
+  int dummy_op_code = -1;
+  char *mp4_input_filename = NULL, *tmux_cmd_args = NULL;
+  
+  // If input file is MPEG2-TS, then transmux it to MP4 and then perform detection
+  if (ends_with((const char *)".ts", (const char *)filename) == true)
+    {
+      
+      //if (asprintf(&mp4_input_filename, "%s/test-input.mp4", get_config()->tmp_output_path, basename(filename)) < 0)
+      if (asprintf(&mp4_input_filename, "%s/test-input.mp4", get_config()->tmp_output_path) < 0)
+	{
+	  syslog(LOG_ERR, "= Could not asprintf mp4_input_filename, %s:%d", __FILE__, __LINE__);
+	  return;
+	}
+
+      if (asprintf(&tmux_cmd_args, "-hide_banner -y -i %s -c:v copy -c:a copy -f mp4 %s", filename, mp4_input_filename) < 0)
+	{
+	  syslog(LOG_ERR, "= Could not asprintf tmux_cmd_args", __FILE__, __LINE__);
+	  return;
+	}
+
+      syslog(LOG_INFO, "= About to execute: /usr/bin/ffmpeg %s\n", tmux_cmd_args);
+      if (prepare_and_exec_cmd(&dummy_op_code, tmux_cmd_args, mp4_input_filename) < 0)
+	{
+	  syslog(LOG_ERR, "= Could not prepare_and_exec_cmd %s", tmux_cmd_args, __FILE__, __LINE__);
+	  return;
+	}
+
+      free(tmux_cmd_args);
+      tmux_cmd_args = NULL;
+      
+    }
+      
+  process_video(prep_netinfo, mp4_input_filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
+
+  free(mp4_input_filename);
+  mp4_input_filename = NULL;
+
   /* demo((char *)get_config()->dnn_config_file,
        (char *)get_config()->dnn_weights_file,
        thresh,

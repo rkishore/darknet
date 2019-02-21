@@ -73,13 +73,14 @@ get_info_from_cmdline_args(int *argc, char **argv)
       {"data-folder-path", required_argument, 0, 'g'},
       {"gpu-idx", required_argument, 0, 'i'},
       {"log-level", required_argument, 0, 'L'},
+      {"tmp-output-path", required_argument, 0, 'm'},
       {"help", no_argument, 0, 'h' },
       {"version", no_argument, 0, 'v' },
       {0, 0, 0, 0 } // last element has to be filled with zeroes as per the man page
     };
 
     int option_index = 0;
-    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:L:hv", 
+    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:L:m:hv", 
 			long_options,
                         &option_index);
     int sizeof_char_ptr = sizeof(char *);
@@ -123,6 +124,9 @@ get_info_from_cmdline_args(int *argc, char **argv)
       //      mod_config()->debug_level = optarg;
       memcpy(mod_config()->debug_level, optarg, sizeof_char_ptr);  
       break; 
+    case 'm':
+      mod_config()->tmp_output_path = optarg;
+      break;
     case 'h' :
     default :
       print_usage(argv[0]);
@@ -195,7 +199,7 @@ cleanup_and_exit()
 
 }
 
-/*
+
 static int 
 job_control_init() 
 {
@@ -245,17 +249,27 @@ job_control_init()
   
   return 0;
 }
-*/
 
 void
 check_if_key_files_and_paths_exist()
 {
 
   // Check if directory exists 
-  if ( ( access(get_config()->dnn_data_file, F_OK ) == -1 ) ||
+  if ( ( (!get_config()->tmp_output_path) || ( access(get_config()->tmp_output_path, F_OK) == -1 ) ) ||
+       ( access(get_config()->dnn_data_file, F_OK ) == -1 ) ||
        ( access(get_config()->dnn_config_file, F_OK ) == -1 ) ||
        ( access(get_config()->dnn_weights_file, F_OK ) == -1 ) ||
        ( access(get_config()->data_folder_path, F_OK ) == -1 ) ) {
+
+    if ( (!get_config()->tmp_output_path) || ( access(get_config()->tmp_output_path, F_OK) == -1 ) )
+      {
+	
+	if (!get_config()->tmp_output_path)
+	  syslog(LOG_ERR, "= tmp_output_path not specified - mandatory. Exiting");
+	else if ( access(get_config()->tmp_output_path, F_OK) == -1 )
+	  syslog(LOG_ERR, "= tmp_output_path %s not accessible. Exiting.", get_config()->tmp_output_path);
+	  
+      }
     
     if ( access(get_config()->dnn_data_file, F_OK ) == -1 )
       {
@@ -325,6 +339,14 @@ basic_initialization(int *argc, char **argv, char *identity)
       // check_error(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
       syslog(LOG_INFO, "= Getting device idx %d, %s:%d", cuda_get_device(), __FILE__, __LINE__);
     }
+
+  if (job_control_init() < 0) {
+    syslog(LOG_ERR, "= Error initializing items related to job_control. Exiting.\n");
+    free_config();
+    curl_global_cleanup();
+    exit(-1);
+  }
+
   return;
 }
 

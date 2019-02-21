@@ -29,6 +29,7 @@ struct Config
   char           input_mode[SMALL_FIXED_STRING_SIZE];
 
   int            gpu_idx;
+  char           *tmp_output_path;
   
 };
 

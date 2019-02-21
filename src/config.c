@@ -45,6 +45,7 @@ void print_usage(const char *app_name)
   fprintf(stderr, "params (mandatory):\n");
   fprintf(stderr, "-a, --interface-name | Primary network interface name (used for licensing purposes) | Default: %s \n", get_config()->interface_name);
   fprintf(stderr, "-g, --data-folder-path | Location of data folder path | Default: %s \n", get_config()->data_folder_path);
+  fprintf(stderr, "-m, --tmp-output-path | Directory where temp. output files are stored | Default: %s\n", get_config()->tmp_output_path);
   fprintf(stderr, "\nparams (optional): \n");
   fprintf(stderr, "-b, --dnn-config-file | Filesystem location of the dnn config file | Default: %s\n", get_config()->dnn_config_file);
   fprintf(stderr, "-c, --dnn-weights-file | Filesystem location of the dnn weights file | Default: %s\n", get_config()->dnn_weights_file);
