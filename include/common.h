@@ -30,6 +30,7 @@
 #define BASIC_PROC_BUFFER 30.1 // how many seconds of data we should process at a time
 #define MAX_WAV_PACKET_SIZE 1024*1024 // For 256Kbps compressed input stream rate/bandwidth, 30s of data =~ 1MB of data
 
+#define ZR_WORDSIZE_IN_BYTES ((sizeof(void *)*CHAR_BIT)/8)
 #define NUM_PROC_THREADS 2 // the audio_decoder and the speech_processing thread
 #define NANOSEC 1000000000
 #define MAX_EVENT_BUFFERS      1
@@ -56,6 +57,7 @@
 #define SECONDS_IN_MINUTE 60
 #define WAVHDR_DEBUG 1
 #define MAX_SIMULTANEOUS_JOBS 5
+#define FILE_DOES_NOT_EXIST 1
 
 typedef uint64_t u64;
 typedef int64_t i64;
@@ -131,4 +133,6 @@ typedef struct _classifyapp_struct_ {
 
 bool starts_with(const char *pre, const char *str);
 bool ends_with(const char *suf, const char *str);
+int get_filename_prefix(char *input, char **prefix_str);
+int check_if_file_exists(char *ifilename);
 //#define CLASSIFYAPP_DEBUG

@@ -46,6 +46,7 @@ int cvRound(double value) {return(ceil(value));}
 #include "classifyapp.h"
 #include "restful.h"
 #include "config.h"
+#include "fork_exec.h"
 #endif
 
 int check_mistakes;
@@ -1539,43 +1540,61 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 			       struct detection_results *results_info)
 {
 
-  int dummy_op_code = -1;
-  char *mp4_input_filename = NULL, *tmux_cmd_args = NULL;
+  int dummy_op_code = -1, retval = -1;
+  char *mp4_input_filename = NULL, *tmux_cmd_args = NULL, *input_filename_prefix = NULL;
   
   // If input file is MPEG2-TS, then transmux it to MP4 and then perform detection
   if (ends_with((const char *)".ts", (const char *)filename) == true)
     {
+      if (get_filename_prefix(basename(filename), &input_filename_prefix) < 0)
+	{
+	  syslog(LOG_ERR, "= Could not get_filename_prefix, %s:%d", __FILE__, __LINE__);
+	  return;
+	}
       
       //if (asprintf(&mp4_input_filename, "%s/test-input.mp4", get_config()->tmp_output_path, basename(filename)) < 0)
-      if (asprintf(&mp4_input_filename, "%s/test-input.mp4", get_config()->tmp_output_path) < 0)
+      if (asprintf(&mp4_input_filename, "%s/%s.mp4", get_config()->tmp_output_path, input_filename_prefix) < 0)
 	{
 	  syslog(LOG_ERR, "= Could not asprintf mp4_input_filename, %s:%d", __FILE__, __LINE__);
 	  return;
 	}
-
+      free(input_filename_prefix);
+      input_filename_prefix = NULL;
+      
       if (asprintf(&tmux_cmd_args, "-hide_banner -y -i %s -c:v copy -c:a copy -f mp4 %s", filename, mp4_input_filename) < 0)
 	{
-	  syslog(LOG_ERR, "= Could not asprintf tmux_cmd_args", __FILE__, __LINE__);
+	  syslog(LOG_ERR, "= Could not asprintf tmux_cmd_args, %s:%d", __FILE__, __LINE__);
 	  return;
 	}
 
-      syslog(LOG_INFO, "= About to execute: /usr/bin/ffmpeg %s\n", tmux_cmd_args);
+      syslog(LOG_INFO, "= About to generate MP4 input using: /usr/bin/ffmpeg %s\n", tmux_cmd_args);
       if (prepare_and_exec_cmd(&dummy_op_code, tmux_cmd_args, mp4_input_filename) < 0)
 	{
-	  syslog(LOG_ERR, "= Could not prepare_and_exec_cmd %s", tmux_cmd_args, __FILE__, __LINE__);
+	  syslog(LOG_ERR, "= Could not prepare_and_exec_cmd %s, %s:%d", tmux_cmd_args, __FILE__, __LINE__);
 	  return;
 	}
 
       free(tmux_cmd_args);
       tmux_cmd_args = NULL;
       
-    }
+      process_video(prep_netinfo, mp4_input_filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
+
+      syslog(LOG_INFO, "= Removing tmp input file: %s", mp4_input_filename);
+      retval = check_if_file_exists(mp4_input_filename);
+      if ( (!retval) && (remove(mp4_input_filename) < 0) )
+	{
+	  syslog(LOG_ERR, "= Could not remove file %s once it is no longer needed", mp4_input_filename);
+	}
       
-  process_video(prep_netinfo, mp4_input_filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
-
-  free(mp4_input_filename);
-  mp4_input_filename = NULL;
-
+      free(mp4_input_filename);
+      mp4_input_filename = NULL;
+      
+    }
+  else
+    {
+      process_video(prep_netinfo, filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
+    }
+  
   /* demo((char *)get_config()->dnn_config_file,
        (char *)get_config()->dnn_weights_file,
        thresh,

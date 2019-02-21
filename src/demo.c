@@ -700,7 +700,10 @@ void process_video(struct prep_network_info *prep_netinfo,
 	       filename, fps, local_frame_count, src_frame_count, results_info->percentage_completed, __FILE__, __LINE__);
       
     }
-    
+
+    syslog(LOG_INFO, "= DONE | For %s, FPS: %0.1f, framecount: %d/%d, percentage_completed = %0.1f, %s:%d",
+	   filename, fps, local_frame_count, src_frame_count, results_info->percentage_completed, __FILE__, __LINE__);
+
     syslog(LOG_INFO, "= Input video stream closed. %s:%d", __FILE__, __LINE__);
     if (output_video_writer) {
         cvReleaseVideoWriter(&output_video_writer);
