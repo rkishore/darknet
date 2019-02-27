@@ -463,7 +463,7 @@ parse_inputfile_stats_and_report_to_DB(struct per_job_info *cur_job_info,
 */
 
 
-static bool child_process_active(pid_t pid, int status, char *job_id) 
+static bool child_process_active(pid_t pid, int status, char *job_id, int *echild_done) 
 {
   bool retval = true;
   
@@ -508,11 +508,12 @@ static bool child_process_active(pid_t pid, int status, char *job_id)
       
       if (errno == ECHILD)
 	{
-      	  retval = false;	  
-	  syslog(LOG_INFO, "= Job_ID: %s | pid: %d | WIFEXIT: %d/%d SIGNAL: %d/%d  | ECHILD: %s\n", 
+      	  retval = false;
+	  *echild_done = 1;
+	  syslog(LOG_INFO, "= Job_ID: %s | pid: %d | WIFEXIT: %d/%d SIGNAL: %d/%d  | ECHILD: %s, %s:%d", 
 		 job_id, pid, 
 		 WIFEXITED(status), WEXITSTATUS(status),
-		 WIFSIGNALED(status), WTERMSIG(status), strerror(errno));
+		 WIFSIGNALED(status), WTERMSIG(status), strerror(errno), __FILE__, __LINE__);
 	}
       else if (errno == EINVAL) 
 	{
@@ -910,7 +911,7 @@ static bool disk_space_full(char *localpath)
 }
 
 int 
-fork_and_execve(char *cmd_to_exec_args, char *output_file_expected, char *localpath) 
+fork_and_execve(char *cmd_to_exec_args, char *output_file_expected, char *localpath, int *echild_done) 
 {
 
   int retval = 0, status = -1, child_pid = -1, child_exit_status = -1, wpid = -1, killed_due_to_hang = 0;
@@ -972,7 +973,7 @@ fork_and_execve(char *cmd_to_exec_args, char *output_file_expected, char *localp
 	signal (SIGTTOU, SIG_DFL);
 	signal (SIGCHLD, SIG_DFL);
 	
-	int a_retval = asprintf(&stderr_filename, "/dev/null");
+	int a_retval = asprintf(&stderr_filename, "%s/ffmpeg.out", localpath);
 	if (a_retval < 0)
 	  {
 	    syslog(LOG_ERR, "= Could not asprintf stderr_filename");
@@ -1000,6 +1001,7 @@ fork_and_execve(char *cmd_to_exec_args, char *output_file_expected, char *localp
 	}
 	
 	dup2(stderr_fd, 1); // make stdout go to file and close stdout
+	dup2(stderr_fd, 2); // make stderr go to file and close stderr
 	close(stderr_fd); // stderr_fd no longer needed - the dup'ed handles are sufficient
 	stderr_fd = -1;
 	free_mem(stderr_filename);
@@ -1036,7 +1038,8 @@ fork_and_execve(char *cmd_to_exec_args, char *output_file_expected, char *localp
 	free_mem(stdin_filename);
 	closelog();
 	
-	cmd_args = argv_from_string("/usr/bin/ffmpeg", cmd_to_exec_args);
+	// cmd_args = argv_from_string("/usr/bin/ffmpeg", cmd_to_exec_args);
+	cmd_args = argv_from_string("/bin/bash", cmd_to_exec_args);
 
 	/* Lower current process priority */
 	errno = 0;
@@ -1072,7 +1075,8 @@ fork_and_execve(char *cmd_to_exec_args, char *output_file_expected, char *localp
 	      }
 	  }
 
-	retval = execve("/usr/bin/ffmpeg", cmd_args, newenviron);
+	//retval = execve("/usr/bin/ffmpeg", cmd_args, newenviron);
+	retval = execve("/bin/bash", cmd_args, newenviron);
 	
 	// Should not be here
 	// report_tcode_error_to_DB(cur_job_info, cmd_to_exec_args, -1, &op_code, "execve failed!");   
@@ -1125,10 +1129,10 @@ fork_and_execve(char *cmd_to_exec_args, char *output_file_expected, char *localp
 	  wpid = TEMP_FAILURE_RETRY(waitpid(child_pid, &status, WUNTRACED|WNOHANG));
 
 	  
-	} while(child_process_active(wpid, status, "1"));
+	} while(child_process_active(wpid, status, "1", echild_done));
 	
 	
-	if ((WIFEXITED(status)) || (errno == ECHILD))
+	if ((WIFEXITED(status)) || (errno == ECHILD) || (*echild_done == 1))
 	  { 
 	    if (WIFEXITED(status))
 	      child_exit_status = WEXITSTATUS(status);
@@ -1261,7 +1265,8 @@ fork_and_execve(char *cmd_to_exec_args, char *output_file_expected, char *localp
 int
 prepare_and_exec_cmd(int *opcode,
 		     char *cmd_args,
-		     char *expected_summary_file)
+		     char *expected_summary_file,
+		     int *echild_done)
 {
   int retval = 0;
 
@@ -1284,7 +1289,7 @@ prepare_and_exec_cmd(int *opcode,
   fcntl(1, F_SETFD, FD_CLOEXEC);
   fcntl(2, F_SETFD, FD_CLOEXEC);
 
-  if ((retval = fork_and_execve(cmd_args, expected_summary_file, get_config()->tmp_output_path)) < 0)
+  if ((retval = fork_and_execve(cmd_args, expected_summary_file, get_config()->tmp_output_path, echild_done)) < 0)
     syslog(LOG_ERR, "= Executing cmd failed with return val: %d\n", retval);
 
   return retval;

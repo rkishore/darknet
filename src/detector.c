@@ -1575,8 +1575,10 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 			       struct detection_results *results_info)
 {
 
-  int dummy_op_code = -1, retval = -1;
+  int dummy_op_code = -1, retval = -1, echild_done = 0;
   char *mp4_input_filename = NULL, *tmux_cmd_args = NULL, *input_filename_prefix = NULL;
+  char *cmd_filename = NULL;
+  FILE *cmdfptr = NULL;
   
   // If input file is MPEG2-TS, then transmux it to MP4 and then perform detection
   if (ends_with((const char *)".ts", (const char *)filename) == true)
@@ -1593,24 +1595,78 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 	  syslog(LOG_ERR, "= Could not asprintf mp4_input_filename, %s:%d", __FILE__, __LINE__);
 	  return;
 	}
+
+      if (asprintf(&cmd_filename, "%s/%d-tmux-cmd.sh", get_config()->tmp_output_path, get_config()->daemon_port) < 0)
+	{
+	  syslog(LOG_ERR, "= Could not asprintf cmd_filename, %s:%d", __FILE__, __LINE__);
+	  return;
+	}
       free(input_filename_prefix);
       input_filename_prefix = NULL;
-      
-      if (asprintf(&tmux_cmd_args, "-hide_banner -y -i %s -c:v copy -c:a copy -f mp4 %s", filename, mp4_input_filename) < 0)
+
+      if (asprintf(&tmux_cmd_args, "-y -i \"%s\" -c:v copy -c:a copy -f mp4 \"%s\"", filename, mp4_input_filename) < 0)
 	{
 	  syslog(LOG_ERR, "= Could not asprintf tmux_cmd_args, %s:%d", __FILE__, __LINE__);
+	  free(cmd_filename);
+	  cmd_filename = NULL;
+	  free(mp4_input_filename);
+	  mp4_input_filename = NULL;
 	  return;
 	}
 
-      syslog(LOG_INFO, "= About to generate MP4 input using: /usr/bin/ffmpeg %s\n", tmux_cmd_args);
-      if (prepare_and_exec_cmd(&dummy_op_code, tmux_cmd_args, mp4_input_filename) < 0)
+      cmdfptr = fopen(cmd_filename, "w");
+      if (cmdfptr != NULL) {
+
+	fwrite("/usr/bin/ffmpeg ", strlen("/usr/bin/ffmpeg "), 1, cmdfptr);
+	fwrite(tmux_cmd_args, strlen(tmux_cmd_args), 1, cmdfptr);
+	fwrite("\n", strlen("\n"), 1, cmdfptr);
+	fclose(cmdfptr);
+	cmdfptr = NULL;
+
+      } else {
+
+	syslog(LOG_ERR, "Could not open file %s to write cmdlog for %s", cmd_filename, filename);
+	free(tmux_cmd_args);
+	tmux_cmd_args = NULL;
+	free(cmd_filename);
+	cmd_filename = NULL;
+	free(mp4_input_filename);
+	mp4_input_filename = NULL;
+	return;
+	
+      }
+      free(tmux_cmd_args);
+      tmux_cmd_args = NULL;
+
+      if (asprintf(&tmux_cmd_args, "%s", cmd_filename) < 0)
 	{
-	  syslog(LOG_ERR, "= Could not prepare_and_exec_cmd %s, %s:%d", tmux_cmd_args, __FILE__, __LINE__);
+	  syslog(LOG_ERR, "= Could not asprintf tmux_cmd_args, %s:%d", __FILE__, __LINE__);
+	  free(cmd_filename);
+	  cmd_filename = NULL;
+	  free(mp4_input_filename);
+	  mp4_input_filename = NULL;
 	  return;
+	}
+
+      // syslog(LOG_INFO, "= About to generate MP4 input using: /usr/bin/ffmpeg %s\n", tmux_cmd_args);
+      if (prepare_and_exec_cmd(&dummy_op_code, tmux_cmd_args, mp4_input_filename, &echild_done) < 0)
+	{
+
+	  syslog(LOG_ERR, "= Could not prepare_and_exec_cmd %s, %s:%d", tmux_cmd_args, __FILE__, __LINE__);
+	  free(tmux_cmd_args);
+	  tmux_cmd_args = NULL;
+	  free(cmd_filename);
+	  cmd_filename = NULL;
+	  free(mp4_input_filename);
+	  mp4_input_filename = NULL;
+	  return;
+	  
 	}
 
       free(tmux_cmd_args);
       tmux_cmd_args = NULL;
+      free(cmd_filename);
+      cmd_filename = NULL;
       
       process_video(prep_netinfo, mp4_input_filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
 
