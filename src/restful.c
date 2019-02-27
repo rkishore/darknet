@@ -596,8 +596,9 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 	   cur_classifyapp_data->appconfig.output_directory,
 	   cur_classifyapp_data->appconfig.output_filepath);
     
-    restful->cur_classify_info.percentage_finished = 0;
-
+    restful->cur_classify_info.percentage_finished = 0; // should remove this duplicate
+    restful->cur_classify_info.results_info.percentage_completed = 0;
+  
     //cJSON_Delete(json);		
     //fprintf(stderr,"\n\n\n\ndecoded data\n");			    
 	    

@@ -56,7 +56,12 @@ static int coco_ids[] = { 1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,
 void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear, int dont_show, int calc_map, int mjpeg_port)
 {
     list *options = read_data_cfg(datacfg);
-    char *train_images = option_find_str(options, "train", "data/train.txt");
+
+    char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.txt", get_config()->data_folder_path);
+    char *train_images = option_find_str(options, "train", names_file_path);
+    
     char *valid_images = option_find_str(options, "valid", train_images);
     char *backup_directory = option_find_str(options, "backup", "/backup/");
 
@@ -435,8 +440,17 @@ void validate_detector(char *datacfg, char *cfgfile, char *weightfile, char *out
 {
     int j;
     list *options = read_data_cfg(datacfg);
-    char *valid_images = option_find_str(options, "valid", "data/train.list");
-    char *name_list = option_find_str(options, "names", "data/names.list");
+
+    char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+    char *name_list = option_find_str(options, "names", names_file_path);
+
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.list", get_config()->data_folder_path);
+    char *valid_images = option_find_str(options, "valid", names_file_path);
+    
+    
     char *prefix = option_find_str(options, "results", "results");
     char **names = get_labels(name_list);
     char *mapf = option_find_str(options, "map", 0);
@@ -578,7 +592,12 @@ void validate_detector_recall(char *datacfg, char *cfgfile, char *weightfile)
 
     //list *plist = get_paths("data/coco_val_5k.list");
     list *options = read_data_cfg(datacfg);
-    char *valid_images = option_find_str(options, "valid", "data/train.txt");
+
+    char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.txt", get_config()->data_folder_path);
+    char *valid_images = option_find_str(options, "valid", names_file_path);
+    
     list *plist = get_paths(valid_images);
     char **paths = (char **)list_to_array(plist);
 
@@ -665,9 +684,18 @@ float validate_detector_map(char *datacfg, char *cfgfile, char *weightfile, floa
 {
     int j;
     list *options = read_data_cfg(datacfg);
-    char *valid_images = option_find_str(options, "valid", "data/train.txt");
     char *difficult_valid_images = option_find_str(options, "difficult", NULL);
-    char *name_list = option_find_str(options, "names", "data/names.list");
+
+    char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+    char *name_list = option_find_str(options, "names", names_file_path);
+
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.txt", get_config()->data_folder_path);
+    char *valid_images = option_find_str(options, "valid", names_file_path);
+
+    
     char **names = get_labels(name_list);
     char *mapf = option_find_str(options, "map", 0);
     int *map = 0;
@@ -677,7 +705,10 @@ float validate_detector_map(char *datacfg, char *cfgfile, char *weightfile, floa
     network net;
     int initial_batch;
     if (existing_net) {
-        char *train_images = option_find_str(options, "train", "data/train.txt");
+	memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+	snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/train.txt", get_config()->data_folder_path);
+	char *train_images = option_find_str(options, "train", names_file_path);
+
         char *valid_images = option_find_str(options, "valid", train_images);
         net = *existing_net;
     }
@@ -1246,7 +1277,11 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     float hier_thresh, int dont_show, int ext_output, int save_labels, char *outfile)
 {
     list *options = read_data_cfg(datacfg);
-    char *name_list = option_find_str(options, "names", "data/names.list");
+
+    char names_file_path[LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE];
+    memset(names_file_path, 0, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE);
+    snprintf(names_file_path, LARGE_FIXED_STRING_SIZE + MEDIUM_FIXED_STRING_SIZE-1, "%s/names.list", get_config()->data_folder_path);
+    char *name_list = option_find_str(options, "names", names_file_path);
     int names_size = 0;
     char **names = get_labels_custom(name_list, &names_size); //get_labels(name_list);
 

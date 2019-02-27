@@ -759,7 +759,7 @@ data load_data_detection(int n, char **paths, int m, int w, int h, int c, int bo
         IplImage *src;
         if ((src = cvLoadImage(filename, flag)) == 0)
         {
-            fprintf(stderr, "Cannot load image \"%s\"\n", filename);
+	  fprintf(stderr, "Cannot load image \"%s\", %s:%d\n", filename, __FILE__, __LINE__);
             char buff[256];
             sprintf(buff, "echo %s >> bad.list", filename);
             system(buff);

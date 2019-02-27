@@ -7,11 +7,15 @@ OPENMP=1
 LIBSO=0
 CLASSIFYAPP=1
 
+INSTALL=install
+DESTDIR=
+prefix=/usr
+
 # set GPU=1 and CUDNN=1 to speedup on GPU
 # set CUDNN_HALF=1 to further speedup 3 x times (Mixed-precision on Tensor Cores) GPU: Volta, Xavier, Turing and higher
 # set AVX=1 and OPENMP=1 to speedup on CPU (if error occurs then set AVX=0)
 
-DEBUG=0
+DEBUG=1
 
 ARCH= -gencode arch=compute_30,code=sm_30 \
       -gencode arch=compute_35,code=sm_35 \
@@ -25,7 +29,7 @@ OS := $(shell uname)
 # ARCH= -gencode arch=compute_70,code=[sm_70,compute_70]
 
 # GeForce RTX 2080 Ti, RTX 2080, RTX 2070, Quadro RTX 8000, Quadro RTX 6000, Quadro RTX 5000, Tesla T4, XNOR Tensor Cores
-ARCH= -gencode arch=compute_75,code=[sm_75,compute_75]
+#ARCH= -gencode arch=compute_75,code=[sm_75,compute_75]
 
 # Jetson XAVIER
 # ARCH= -gencode arch=compute_72,code=[sm_72,compute_72]
@@ -133,7 +137,7 @@ endif
 OBJS = $(addprefix $(OBJDIR), $(OBJ))
 DEPS = $(wildcard src/*.h) Makefile include/darknet.h
 
-all: obj backup results setchmod $(EXEC) $(LIBNAMESO) $(APPNAMESO)
+all: obj backup results $(EXEC) $(LIBNAMESO) $(APPNAMESO)
 
 ifeq ($(LIBSO), 1) 
 CFLAGS+= -fPIC
@@ -171,3 +175,10 @@ setchmod:
 clean:
 	rm -rf $(OBJS) $(EXEC) $(LIBNAMESO) $(APPNAMESO)
 
+install:
+	$(INSTALL) -d "$(DESTDIR)$(prefix)"
+	$(INSTALL) -d "$(DESTDIR)$(prefix)/bin"
+	$(INSTALL) -m 755 classifyapp "$(DESTDIR)$(prefix)/bin"
+
+uninstall:
+	rm -f $(DESTDIR)$(prefix)/bin/classifyapp

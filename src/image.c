@@ -23,6 +23,8 @@
 #endif
 #include "http_stream.h"
 
+#include "config.h"
+
 #define CV_RGB(r, g, b) cvScalar( (b), (g), (r), 0 )
 #endif
 
@@ -259,8 +261,8 @@ image **load_alphabet()
     for(j = 0; j < nsize; ++j){
         alphabets[j] = calloc(128, sizeof(image));
         for(i = 32; i < 127; ++i){
-            char buff[256];
-            sprintf(buff, "data/labels/%d_%d.png", i, j);
+	    char buff[512];
+            sprintf(buff, "%s/labels/%d_%d.png", get_config()->data_folder_path, i, j);
             alphabets[j][i] = load_image_color(buff, 0, 0);
         }
     }
@@ -1107,7 +1109,7 @@ image load_image_cv(char *filename, int channels)
         char shrinked_filename[1024];
         if (strlen(filename) >= 1024) sprintf(shrinked_filename, "name is too long");
         else sprintf(shrinked_filename, "%s", filename);
-        fprintf(stderr, "Cannot load image \"%s\"\n", shrinked_filename);
+        fprintf(stderr, "Cannot load image \"%s\", %s:%d\n", shrinked_filename, __FILE__, __LINE__);
         FILE* fw = fopen("bad.list", "a");
         fwrite(shrinked_filename, sizeof(char), strlen(shrinked_filename), fw);
         char *new_line = "\n";
