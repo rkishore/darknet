@@ -75,8 +75,8 @@ IplImage* show_img;
 static int flag_exit;
 static int letter_box = 0;
 
-cJSON *per_frame_json = NULL;
-static int local_frame_count = 0;
+cJSON *per_frame_json = NULL, *regions_json = NULL;
+static int local_frame_count = 0, src_fps = 25;
 
 void *fetch_in_thread(void *ptr)
 {
@@ -130,7 +130,142 @@ double get_wall_time()
     return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }
 
-void add_info_to_per_frame_json(char *ptr)
+void add_info_to_per_frame_json(char *ptr, bool initial_call)
+{
+  
+  cJSON *regions_array_json = NULL, *region_json = NULL, *bbox_json = NULL;
+  char tmp_char_buff[128];
+  int i,j, num_labels_detected = 0, cur_milliseconds = 0;
+  int left, right, top, bot;
+  box b;
+  
+  if (initial_call == true)
+    {
+      /* 
+	 {
+	 "/home/igolgi/shared/Day_Vig6_Open1_HDLL_HD380.mp4": {
+	 }
+	 }
+       */
+      cJSON_AddItemToObject(per_frame_json, ptr, regions_json=cJSON_CreateObject());
+
+    }
+
+  for(i = 0; i < nboxes; ++i){
+    for(j = 0; j < demo_classes; ++j){
+      if (dets[i].prob[j] > demo_thresh){
+	num_labels_detected += 1;
+      }
+    }
+  }
+  
+  if (num_labels_detected > 0)
+    {
+
+      cur_milliseconds = local_frame_count * src_fps;
+      syslog(LOG_DEBUG, "= local_frame_count: %d, src_fps = %d, cur_ms: %d, %s:%d", local_frame_count, src_fps, cur_milliseconds, __FILE__, __LINE__);
+      memset(tmp_char_buff, 0, 128);
+      sprintf(tmp_char_buff, "%d", cur_milliseconds);
+      /*
+	{
+	"/home/igolgi/shared/Day_Vig6_Open1_HDLL_HD380.mp4": {
+	
+	"5432" : [
+	],
+	
+	}
+	}
+       */
+      regions_array_json = cJSON_AddArrayToObject(regions_json, tmp_char_buff);
+      
+      for(i = 0; i < nboxes; ++i){
+	for(j = 0; j < demo_classes; ++j){
+	  if (dets[i].prob[j] > demo_thresh){
+
+	    /*
+	      {
+	      "/home/igolgi/shared/Day_Vig6_Open1_HDLL_HD380.mp4": {
+	      
+	      "5432" : [
+	      {
+	    
+	      },
+	      ],
+	      }
+	      }
+	    */
+	    region_json = cJSON_CreateObject();
+
+	    /*
+	      {
+	      "/home/igolgi/shared/Day_Vig6_Open1_HDLL_HD380.mp4": {
+	      
+	      "5432" : [
+	      {
+	      "confidence": 98.0,
+	      "timestamp": 5432,
+	      "category": "vehicle",
+	      "bounding_box": {
+	      },
+	      ],
+	      }
+	      }
+	    */
+	    cJSON_AddNumberToObject(region_json, "confidence", dets[i].prob[j]);
+	    cJSON_AddNumberToObject(region_json, "timestamp", cur_milliseconds);
+	    cJSON_AddStringToObject(region_json, "category", demo_names[j]);
+	    cJSON_AddItemToObject(region_json, "bounding_box", bbox_json=cJSON_CreateObject());
+	    
+	    b = dets[i].bbox;
+	    
+	    // results_info->confidence[k] = dets[i].prob[j]*100;
+	    
+	    left  = (b.x-b.w/2.)*det_img->width;
+	    right = (b.x+b.w/2.)*det_img->width;
+	    top   = (b.y-b.h/2.)*det_img->height;
+	    bot   = (b.y+b.h/2.)*det_img->height;
+	    
+	    if(left < 0) left = 0;
+	    if(right > det_img->width-1) right = det_img->width-1;
+	    if(top < 0) top = 0;
+	    if(bot > det_img->height-1) bot = det_img->height-1;
+
+	    /*
+	      {
+	      "/home/igolgi/shared/Day_Vig6_Open1_HDLL_HD380.mp4": {
+	      
+	      "5432" : [
+	      {
+	      "confidence": 98.0,
+	      "timestamp": 5432,
+	      "category": "vehicle",
+	      "bounding_box": {
+	      "height": 22,
+	      "width": 67,
+	      "x": 1527,
+	      "y": 643
+	      },
+	      ],
+	      }
+	      }
+	    */
+
+	    cJSON_AddNumberToObject(bbox_json, "height", (int)(b.h * det_img->height));
+	    cJSON_AddNumberToObject(bbox_json, "width", (int)(b.w * det_img->width));
+	    cJSON_AddNumberToObject(bbox_json, "x", (int)(left));
+	    cJSON_AddNumberToObject(bbox_json, "y", (int)(top));
+	    
+	    cJSON_AddItemToArray(regions_array_json, region_json);
+	    
+	  }
+	}
+      }
+    }
+
+  
+}
+
+void add_info_to_per_frame_json_old(char *ptr)
 {
   cJSON *regions_json = NULL, *regions_array_json = NULL, *region_json = NULL;
   char tmp_char_buff[128];
@@ -285,7 +420,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     {
         CvSize size;
         size.width = det_img->width, size.height = det_img->height;
-        int src_fps = 25, src_frame_count = -1;
+        int src_frame_count = -1;
+	src_fps = 25;
         src_fps = get_stream_fps(cap, cpp_video_capture);
 	src_frame_count = get_stream_frame_count(cap, cpp_video_capture);
 	
@@ -334,7 +470,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 	    if ((show_img != NULL) && (per_frame_json != NULL))
 	      {
-		add_info_to_per_frame_json((char *)filename);
+		add_info_to_per_frame_json_old((char *)filename);
 	      }
 		
             free_detections(local_dets, local_nboxes);
@@ -465,7 +601,8 @@ void process_video(struct prep_network_info *prep_netinfo,
     CvVideoWriter* output_video_writer = NULL;    // cv::VideoWriter output_video;
     double before = 0.0;
     int delay = frame_skip, src_frame_count = -1;
-
+    bool first_json_entry = true;
+    
     in_img = det_img = show_img = NULL;
     
     demo_alphabet = prep_netinfo->alphabet;
@@ -597,7 +734,6 @@ void process_video(struct prep_network_info *prep_netinfo,
 
 
     before = get_wall_time();
-
     while(1){
       {
 	//if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
@@ -623,7 +759,11 @@ void process_video(struct prep_network_info *prep_netinfo,
 	draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 	
 	if ((show_img != NULL) && (per_frame_json != NULL))
-	  add_info_to_per_frame_json((char *)filename);
+	  {
+	    add_info_to_per_frame_json((char *)filename, first_json_entry);
+	    if (first_json_entry)
+	      first_json_entry = false;
+	  }
 	  	
 	free_detections(local_dets, local_nboxes); // dets, boxes freed
 	local_dets = NULL;
@@ -876,7 +1016,7 @@ void process_video_old(struct prep_network_info *prep_netinfo,
 	draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 	
 	if ((show_img != NULL) && (per_frame_json != NULL))
-	  add_info_to_per_frame_json((char *)filename);
+	  add_info_to_per_frame_json_old((char *)filename);
 	  	
 	free_detections(local_dets, local_nboxes);
 
