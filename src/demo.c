@@ -76,7 +76,7 @@ static int flag_exit;
 static int letter_box = 0;
 
 cJSON *per_frame_json = NULL, *regions_json = NULL;
-static int local_frame_count = 0, src_fps = 25;
+static int local_frame_count = -1, src_fps = 25;
 
 void *fetch_in_thread(void *ptr)
 {
@@ -564,7 +564,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     for (j = 0; j < FRAMES; ++j) free_image(images[j]);
 
     // free_ptrs(names, net.layers[net.n - 1].classes);
-    local_frame_count = 0;
+    local_frame_count = -1;
     
     int i;
     const int nsize = 8;
@@ -718,7 +718,6 @@ void process_video(struct prep_network_info *prep_netinfo,
       {
         CvSize size;
         size.width = det_img->width, size.height = det_img->height;
-	int src_fps = 25;
         src_fps = get_stream_fps(cap, cpp_video_capture);
 	src_frame_count = get_stream_frame_count(cap, cpp_video_capture);
 
@@ -867,7 +866,7 @@ void process_video(struct prep_network_info *prep_netinfo,
     cvReleaseImage(&show_img);
     cvReleaseImage(&in_img);
     free_image(in_s);
-    local_frame_count = 0;
+    local_frame_count = -1;
     src_frame_count = -1;
     // close_stream(cap, cpp_video_capture);
     // cap = NULL;
@@ -977,7 +976,6 @@ void process_video_old(struct prep_network_info *prep_netinfo,
     {
         CvSize size;
         size.width = det_img->width, size.height = det_img->height;
-        int src_fps = 25;
         src_fps = get_stream_fps(cap, cpp_video_capture);
 
         //const char* output_name = "test_dnn_out.avi";
