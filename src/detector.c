@@ -1668,7 +1668,7 @@ void run_detector_custom_video(struct prep_network_info *prep_netinfo,
       free(cmd_filename);
       cmd_filename = NULL;
       
-      process_video(prep_netinfo, mp4_input_filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
+      process_video(prep_netinfo, filename, mp4_input_filename, thresh, hier_thresh, NULL, outfile, 1, outjson, 0, 0, results_info);
       //process_video(prep_netinfo, filename, mp4_input_filename, thresh, hier_thresh, NULL, NULL, 1, outjson, 0, 0, results_info);
 
       syslog(LOG_INFO, "= Removing tmp input file: %s", mp4_input_filename);
