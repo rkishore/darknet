@@ -554,6 +554,19 @@ int get_stream_frame_count_cpp(CvCapture *cap) {
     return frame_count;
 }
 
+int close_stream_cpp(CvCapture *cap) {
+    int retval = 0;
+    try {
+        cv::VideoCapture &cpp_cap = *(cv::VideoCapture *)cap;
+        cpp_cap.release();
+    }
+    catch (...) {
+        cerr << " Can't release cap\n";
+	retval = -1;
+    }
+    return retval;
+}
+
 // ----------------------------------------
 extern "C" {
     image ipl_to_image(IplImage* src);    // image.c

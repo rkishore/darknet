@@ -67,7 +67,7 @@ image get_image_from_stream_resize(CvCapture *cap, int w, int h, int c, IplImage
 image get_image_from_stream_letterbox(CvCapture *cap, int w, int h, int c, IplImage** in_img, int cpp_video_capture, int dont_close);
 int get_stream_fps(CvCapture *cap, int cpp_video_capture);
 int get_stream_frame_count(CvCapture *cap, int cpp_video_capture);
-// int close_stream(CvCapture *cap, int cpp_video_capture);
+int close_stream(CvCapture *cap, int cpp_video_capture);
 IplImage* in_img;
 IplImage* det_img;
 IplImage* show_img;
@@ -581,6 +581,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 #ifdef CLASSIFYAPP
 void process_video(struct prep_network_info *prep_netinfo,
+		   char *orig_filename,
 		   char *filename,
 		   float thresh,
 		   float hier_thresh,
@@ -714,13 +715,14 @@ void process_video(struct prep_network_info *prep_netinfo,
 
     }
 
+    src_fps = get_stream_fps(cap, cpp_video_capture);
+    src_frame_count = get_stream_frame_count(cap, cpp_video_capture);
+
     if (out_filename && !flag_exit)
       {
         CvSize size;
         size.width = det_img->width, size.height = det_img->height;
-        src_fps = get_stream_fps(cap, cpp_video_capture);
-	src_frame_count = get_stream_frame_count(cap, cpp_video_capture);
-
+	
         //const char* output_name = "test_dnn_out.avi";
         output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('H', '2', '6', '4'), src_fps, size, 1);
         //output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('D', 'I', 'V', 'X'), src_fps, size, 1);
@@ -759,7 +761,7 @@ void process_video(struct prep_network_info *prep_netinfo,
 	
 	if ((show_img != NULL) && (per_frame_json != NULL))
 	  {
-	    add_info_to_per_frame_json((char *)filename, first_json_entry);
+	    add_info_to_per_frame_json((char *)orig_filename, first_json_entry);
 	    if (first_json_entry)
 	      first_json_entry = false;
 	  }
@@ -853,11 +855,14 @@ void process_video(struct prep_network_info *prep_netinfo,
       {
 	char *full_json_string = cJSON_Print(per_frame_json);
 	if (full_json_string == NULL) {
-	  fprintf(stderr, "Failed to print per_frame_json.\n");
+	  syslog(LOG_ERR, "= Failed to print per_frame_json to file");
 	} else {
 	  FILE *json_ofp = fopen(json_filename, "w");
 	  fwrite(full_json_string, sizeof(char), strlen(full_json_string), json_ofp);
 	  fclose(json_ofp);
+	  free(full_json_string);
+	  full_json_string = NULL;
+	  syslog(LOG_INFO, "= Done writing output JSON file");
 	}
 	cJSON_Delete(per_frame_json);
       }
@@ -868,8 +873,8 @@ void process_video(struct prep_network_info *prep_netinfo,
     free_image(in_s);
     local_frame_count = -1;
     src_frame_count = -1;
-    // close_stream(cap, cpp_video_capture);
-    // cap = NULL;
+    close_stream(cap, cpp_video_capture);
+    cap = NULL;
 
     free(avg);
     for (j = 0; j < FRAMES; ++j) free(predictions[j]);

@@ -1264,6 +1264,18 @@ int get_stream_frame_count(CvCapture *cap, int cpp_video_capture)
     return frame_count;
 }
 
+int close_stream(CvCapture *cap, int cpp_video_capture)
+{
+  int retval = 0;
+  if (cpp_video_capture) {
+    retval = close_stream_cpp(cap);
+  }
+  else {
+    fprintf(stderr, "= Don't have a way to close out the capture when cpp_video_capture is not 1, %s, %d", __FILE__, __LINE__);
+  }
+  return retval;
+}
+
 #endif  // OPENCV
 
 void save_image_png(image im, const char *name)

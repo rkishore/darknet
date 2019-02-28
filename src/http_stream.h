@@ -22,6 +22,7 @@ CvCapture* get_capture_video_stream(char *path);
 IplImage* get_webcam_frame(CvCapture *cap);
 int get_stream_fps_cpp(CvCapture *cap);
 int get_stream_frame_count_cpp(CvCapture *cap);
+int close_stream_cpp(CvCapture *cap);
   
 image image_data_augmentation(IplImage* ipl, int w, int h,
     int pleft, int ptop, int swidth, int sheight, int flip,

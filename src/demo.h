@@ -8,6 +8,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #include "classifyapp.h"
 #include "restful.h"
 void process_video(struct prep_network_info *prep_netinfo,
+		   char *orig_filename,
 		   char *filename,
 		   float thresh,
 		   float hier_thresh,
