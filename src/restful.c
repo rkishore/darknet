@@ -463,14 +463,19 @@ static int store_output_loc(cJSON **output_file_dir, cJSON **output_file_path, c
   // mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
   // int output_fd = -1;
 
-  if ( (output_dir) && (output_file) ) {
+  // if ( (output_dir) && (output_file) ) {
+  if (output_dir) {
 
     snprintf(classifyapp_data->appconfig.output_directory, LARGE_FIXED_STRING_SIZE-1, "%s", output_dir->valuestring);
-    snprintf(classifyapp_data->appconfig.output_filepath, LARGE_FIXED_STRING_SIZE-1, "%s", output_file->valuestring);
+    if (output_file)
+      snprintf(classifyapp_data->appconfig.output_filepath, LARGE_FIXED_STRING_SIZE-1, "%s", output_file->valuestring);
+    else
+      classifyapp_data->appconfig.output_filepath[0] = '\0';
+    
     if (output_json)
       snprintf(classifyapp_data->appconfig.output_json_filepath, LARGE_FIXED_STRING_SIZE-1, "%s", output_json->valuestring);
     //fprintf(stderr,"output_data: %s\n", classifyapp_data->appconfig.output_filename);
-    //syslog(LOG_INFO,"= output_filename: %s\n", classifyapp_data->appconfig.output_filename);
+    syslog(LOG_DEBUG,"= output_filename: %s, %d, %s:%d", classifyapp_data->appconfig.output_filepath, (int)strlen(classifyapp_data->appconfig.output_filepath));
 
   } else {
     
@@ -554,7 +559,8 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     config_data = cJSON_GetObjectItem(*parsedjson, "config");
 
     if ( (input_data == NULL) || (input_type_data == NULL) ||
-	 (output_dir == NULL) || (output_filepath == NULL) || (config_data == NULL) ) {
+	 (output_dir == NULL) || (config_data == NULL) ) {
+      syslog(LOG_ERR, "= Not enough input args specified, %s:%d", __FILE__, __LINE__);
       *return_http_flag = HTTP_400;
       return -1;
     }
@@ -594,7 +600,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 	   cur_classifyapp_data->appconfig.input_type,
 	   (input_mode == NULL) ? "unspecified" : cur_classifyapp_data->appconfig.input_mode,
 	   cur_classifyapp_data->appconfig.output_directory,
-	   cur_classifyapp_data->appconfig.output_filepath);
+	   (output_filepath == NULL) ? "unspecified" : cur_classifyapp_data->appconfig.output_filepath);
     
     restful->cur_classify_info.percentage_finished = 0; // should remove this duplicate
     restful->cur_classify_info.results_info.percentage_completed = 0;
