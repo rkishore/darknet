@@ -213,6 +213,7 @@ void add_info_to_per_frame_json(char *ptr, bool initial_call)
 	    */
 	    cJSON_AddNumberToObject(region_json, "confidence", dets[i].prob[j]);
 	    cJSON_AddNumberToObject(region_json, "timestamp", cur_milliseconds);
+	    // cJSON_AddNumberToObject(region_json, "frame_num", local_frame_count);
 	    cJSON_AddStringToObject(region_json, "category", demo_names[j]);
 	    cJSON_AddItemToObject(region_json, "bounding_box", bbox_json=cJSON_CreateObject());
 	    
