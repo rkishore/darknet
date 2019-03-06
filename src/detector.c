@@ -1542,26 +1542,31 @@ void run_detector_custom(struct prep_network_info *prep_netinfo,
     float *X = sized.data;
     time=what_time_is_it_now();
     network_predict(net, X);
-    results_info->processing_time_in_seconds = what_time_is_it_now()-time;
-    // printf("= %s: Predicted in %f seconds.\n", input, results_info->processing_time_in_seconds);
+    //results_info->processing_time_in_seconds = what_time_is_it_now()-time;
+    //printf("= %s: Predicted in %f seconds.\n", input, results_info->processing_time_in_seconds);
     int nboxes = 0;
     detection *dets = get_network_boxes(&net, im.w, im.h, thresh, hier_thresh, 0, 1, &nboxes, letterbox);
     //printf("%d\n", nboxes);
     //if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
     if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
     get_detections_custom(im, dets, nboxes, thresh, names, l.classes, results_info);
-    // draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
-    draw_detections_v3(im, dets, nboxes, thresh, names, alphabet, l.classes, 0);
-	  
-    if ( (outfile == NULL) || (strlen(outfile) == 0) )
+    //results_info->processing_time_in_seconds = what_time_is_it_now()-time;
+    //printf("= %s: Predicted in %f seconds.\n", input, results_info->processing_time_in_seconds);
+
+    if (get_config()->fastmode == false)
       {
-	syslog(LOG_INFO, "= Outfile is NULL/unspecified, writing to predictions, %s:%d", __FILE__, __LINE__);
-	save_image(im, "/tmp/predictions");
-      }
-    else
-      {
-	syslog(LOG_INFO, "= Outfile is not NULL, writing to %s, %s:%d", outfile, __FILE__, __LINE__);
-	save_image(im, outfile);
+	draw_detections_v3(im, dets, nboxes, thresh, names, alphabet, l.classes, 0);
+	
+	if ( (outfile == NULL) || (strlen(outfile) == 0) )
+	  {
+	    syslog(LOG_DEBUG, "= Outfile is NULL/unspecified, writing to predictions, %s:%d", __FILE__, __LINE__);
+	    save_image(im, "/tmp/predictions");
+	  }
+	else
+	  {
+	    syslog(LOG_DEBUG, "= Outfile is not NULL, writing to %s, %s:%d", outfile, __FILE__, __LINE__);
+	    save_image(im, outfile);
+	  }
       }
     
     free_detections(dets, nboxes);    
@@ -1569,7 +1574,10 @@ void run_detector_custom(struct prep_network_info *prep_netinfo,
     free_image(sized);
     if (filename) break;
   }
-  
+
+  results_info->processing_time_in_seconds = what_time_is_it_now()-time;
+  //printf("= %s: Predicted in %f seconds.\n", input, results_info->processing_time_in_seconds);
+
   return;
 }
 

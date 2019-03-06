@@ -639,7 +639,7 @@ static void copy_to_global_config(restful_comm_struct *restful_ptr)
   if (strlen(classifyapp_info->appconfig.input_mode) > 0)
     memcpy(mod_config()->output_json_filepath, classifyapp_info->appconfig.output_json_filepath, strlen(classifyapp_info->appconfig.output_json_filepath));
 
-  syslog(LOG_INFO, "= COPIED DISPATCH_MSG | image_url: %s (%s) | output_directory: %s | output_filepath: %s | output_json_filepath: %s\n", 
+  syslog(LOG_DEBUG, "= COPIED DISPATCH_MSG | image_url: %s (%s) | output_directory: %s | output_filepath: %s | output_json_filepath: %s\n", 
 	 get_config()->image_url,
 	 get_config()->input_type,
 	 get_config()->output_directory,
@@ -1173,7 +1173,7 @@ static void *restful_comm_thread_func(void *context)
 	  if (dispatch_msg) {
 	    memset(dispatch_msg, 0, sizeof(igolgi_message_struct));
 	    dispatch_msg->buffer_flags = http_response_status;
-	    syslog(LOG_INFO, "= Sending dispatch msg: %d", http_response_status);
+	    syslog(LOG_DEBUG, "= Sending dispatch msg: %d", http_response_status);
 	    message_queue_push_front(restful->dispatch_queue, dispatch_msg);
 	    dispatch_msg = NULL;
 	  }

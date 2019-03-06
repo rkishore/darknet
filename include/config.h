@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 #define HSIGNATURE_SIZE 1024
 #define SMALL_FIXED_STRING_SIZE 8
 #define MEDIUM_FIXED_STRING_SIZE 40
@@ -30,6 +32,8 @@ struct Config
 
   int            gpu_idx;
   char           *tmp_output_path;
+  
+  bool           fastmode; // avoid checking the input params if this is set to true
   
 };
 

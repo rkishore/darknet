@@ -55,7 +55,8 @@ void print_usage(const char *app_name)
   fprintf(stderr, "-g, --data-folder-path | Filesystem location of the dnn data folder | Default: %s\n", get_config()->data_folder_path);
   fprintf(stderr, "-i, --gpu-idx | In a multi-GPU system, selecting the GPU to run on | Default: %d\n", get_config()->gpu_idx);
   fprintf(stderr, "-L, --log-level | Set the syslog LOG LEVEL | Default: LOG_INFO (%s) \n", get_config()->debug_level);
-  
+  fprintf(stderr, "-n, --fastmode | Run faster by avoiding input_params check per image | Default: %d\n", (int)get_config()->fastmode);
+    
   fprintf(stderr, "\n");
 
   return;
@@ -147,6 +148,7 @@ void fill_default_config()
   config->detection_threshold = 0.5;
   config->daemon_port = 55555;
   config->gpu_idx = -1;
+  config->fastmode = false;
   
   return;
   

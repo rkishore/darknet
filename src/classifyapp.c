@@ -223,6 +223,12 @@ static int fill_input_mode_based_on_file_type(classifyapp_struct *classifyapp_da
 	}
     }   
 
+  if (typecheck == 0)
+    {
+      memset(mod_config()->input_mode, 0, SMALL_FIXED_STRING_SIZE);
+      if (strlen(classifyapp_data->appconfig.input_mode) > 0)
+	memcpy(mod_config()->input_mode, classifyapp_data->appconfig.input_mode, strlen(classifyapp_data->appconfig.input_mode));
+    }
   return retval;
   
 }
@@ -233,79 +239,101 @@ static int check_input_url(restful_comm_struct *restful_ptr)
   int typecheck = -1, retval = 0;
   char *samplefilename = NULL;
   classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
-      
-  if (config_curl_and_pull_file_sample(restful_ptr->classifyapp_data) < 0)
-    {
-      syslog(LOG_ERR, "= Could not check file for file type from input_url, %s:%d", __FILE__, __LINE__);
-      retval = -1;
-      goto exit_check_input_url;
-    }    
 
-  if (asprintf(&samplefilename, "%s/%s", restful_ptr->classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
+  if (get_config()->fastmode == false)
     {
-      syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
-      retval = -1;
-      goto exit_check_input_url;
-    }
+      if (config_curl_and_pull_file_sample(restful_ptr->classifyapp_data) < 0)
+	{
+	  syslog(LOG_ERR, "= Could not check file for file type from input_url, %s:%d", __FILE__, __LINE__);
+	  retval = -1;
+	  goto exit_check_input_url;
+	}    
+
+      if (asprintf(&samplefilename, "%s/%s", restful_ptr->classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
+	{
+	  syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
+	  retval = -1;
+	  goto exit_check_input_url;
+	}
   
-  // Check if this is a text file to reject it
-  typecheck = check_file_type(samplefilename, "text");
-  if (typecheck <= 0) // if its an error (typecheck = -1) or a text file (typecheck = 0)
-    {
-
-      free(samplefilename);
-      samplefilename = NULL;
-      
-      retval = -1;
-      goto exit_check_input_url;
-      
-    }
-
-  if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
-    {
-
-      if (fill_input_mode_based_on_file_type(cur_classifyapp_data, samplefilename) < 0)
+      // Check if this is a text file to reject it
+      typecheck = check_file_type(samplefilename, "text");
+      if (typecheck <= 0) // if its an error (typecheck = -1) or a text file (typecheck = 0)
 	{
 
 	  free(samplefilename);
 	  samplefilename = NULL;
-	  
+      
 	  retval = -1;
 	  goto exit_check_input_url;
+      
+	}
+
+      if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
+	{
+
+	  if (fill_input_mode_based_on_file_type(cur_classifyapp_data, samplefilename) < 0)
+	    {
+
+	      free(samplefilename);
+	      samplefilename = NULL;
+	  
+	      retval = -1;
+	      goto exit_check_input_url;
+	  
+	    }
+
+	  syslog(LOG_INFO, "= INPUT MODE: %s, %s:%d", cur_classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
+      
+	}
+
+      free(samplefilename);
+      samplefilename = NULL;
+    
+      if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
+	{
+      
+	  if ( !( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) ) )
+	    {
+	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+	      retval = -1;
+	    }
+      
+	}
+      else if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "video"))
+	{
+      
+	  if ( !( (ends_with("mp4", get_config()->image_url) == true) || (ends_with("ts", get_config()->image_url) == true) ) )
+	    {
+	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .ts or .mp4 yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+	      retval = -1;
+	    }
+
+	  memset(mod_config()->output_json_filepath, 0, LARGE_FIXED_STRING_SIZE);
+	  memcpy(mod_config()->output_json_filepath, cur_classifyapp_data->appconfig.output_json_filepath, strlen(cur_classifyapp_data->appconfig.output_json_filepath));
+      
+	}
+    }
+  else
+    {
+      if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
+	{
+	  if ( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) )
+	    snprintf(cur_classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "image");
+	  else if ( (ends_with("mp4", get_config()->image_url) == true) || (ends_with("ts", get_config()->image_url) == true) )
+	    snprintf(cur_classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "video");
+	  else
+	    {
+	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png or .mp4 or .ts yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+	      retval = -1;
+	    }
+
+	  memset(mod_config()->input_mode, 0, SMALL_FIXED_STRING_SIZE);
+	  if (strlen(cur_classifyapp_data->appconfig.input_mode) > 0)
+	    memcpy(mod_config()->input_mode, cur_classifyapp_data->appconfig.input_mode, strlen(cur_classifyapp_data->appconfig.input_mode));
 	  
 	}
-
-      syslog(LOG_INFO, "= INPUT MODE: %s, %s:%d", cur_classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
-      
     }
-
-  free(samplefilename);
-  samplefilename = NULL;
-    
-  if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
-    {
-      
-      if ( !( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) ) )
-	{
-	  syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
-	  retval = -1;
-	}
-      
-    }
-  else if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "video"))
-    {
-      
-      if ( !( (ends_with("mp4", get_config()->image_url) == true) || (ends_with("ts", get_config()->image_url) == true) ) )
-	{
-	  syslog(LOG_ERR, "= Cannot support URLs that don't end in .ts or .mp4 yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
-	  retval = -1;
-	}
-
-      memset(mod_config()->output_json_filepath, 0, LARGE_FIXED_STRING_SIZE);
-      memcpy(mod_config()->output_json_filepath, cur_classifyapp_data->appconfig.output_json_filepath, strlen(cur_classifyapp_data->appconfig.output_json_filepath));
-      
-    }
-  
  exit_check_input_url:
   return retval;
 
@@ -473,7 +501,7 @@ static void *restful_classify_thread_func(void *context)
       free(dispatch_msg);
       dispatch_msg = NULL;
       
-      syslog(LOG_INFO, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_filepath: %s",
+      syslog(LOG_DEBUG, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_filepath: %s",
 	     classifyapp_info->appconfig.input_url, 
 	     classifyapp_info->appconfig.output_directory,
 	     classifyapp_info->appconfig.output_filepath);
@@ -526,7 +554,7 @@ static void *restful_classify_thread_func(void *context)
 
     if (!strcmp(restful->classifyapp_data->appconfig.input_mode, "image"))
       {
-	syslog(LOG_INFO, "= About to run the detect+classify for %s: %s, %s:%d", restful->classifyapp_data->appconfig.input_mode,
+	syslog(LOG_DEBUG, "= About to run the detect+classify for %s: %s, %s:%d", restful->classifyapp_data->appconfig.input_mode,
 	       restful->classifyapp_data->appconfig.input_filename,
 	       __FILE__, __LINE__);
   
@@ -556,10 +584,11 @@ static void *restful_classify_thread_func(void *context)
 	pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
 	restful->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
 	pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
-	
+
 	syslog(LOG_INFO, "= Num. labels detected: %d in time: %0.2f milliseconds",
 	       restful->cur_classify_info.results_info.num_labels_detected,
 	       restful->cur_classify_info.results_info.processing_time_in_seconds * 1000.0);
+
 	for (i = 0; i<restful->cur_classify_info.results_info.num_labels_detected; i++)
 	  syslog(LOG_INFO, "= Label #: %d | name: %s | confidence: %0.2f%% | tl: (%d,%d), tr: (%d,%d), bl: (%d,%d), br: (%d,%d)",
 		 i,

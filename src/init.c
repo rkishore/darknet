@@ -74,13 +74,14 @@ get_info_from_cmdline_args(int *argc, char **argv)
       {"gpu-idx", required_argument, 0, 'i'},
       {"log-level", required_argument, 0, 'L'},
       {"tmp-output-path", required_argument, 0, 'm'},
+      {"fastmode", no_argument, 0, 'n'},
       {"help", no_argument, 0, 'h' },
       {"version", no_argument, 0, 'v' },
       {0, 0, 0, 0 } // last element has to be filled with zeroes as per the man page
     };
 
     int option_index = 0;
-    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:L:m:hv", 
+    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:L:m:nhv", 
 			long_options,
                         &option_index);
     int sizeof_char_ptr = sizeof(char *);
@@ -126,6 +127,9 @@ get_info_from_cmdline_args(int *argc, char **argv)
       break; 
     case 'm':
       mod_config()->tmp_output_path = optarg;
+      break;
+    case 'n':
+      mod_config()->fastmode = true;
       break;
     case 'h' :
     default :
