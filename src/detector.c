@@ -1475,7 +1475,12 @@ void get_detections_custom(image im, detection *dets, int num, float thresh, cha
     right = (selected_detections[i].det.bbox.x + selected_detections[i].det.bbox.w / 2)*im.w;
     top = (selected_detections[i].det.bbox.y - selected_detections[i].det.bbox.h / 2)*im.h;
     bot = (selected_detections[i].det.bbox.y + selected_detections[i].det.bbox.h / 2)*im.h;
-    
+
+    if(left < 0) left = 0;
+    if(right > (im.w-1)) right = im.w-1;
+    if(top < 0) top = 0;
+    if(bot > (im.h-1)) bot = im.h-1;
+
     results_info->left[i] = left;
     results_info->right[i] = right;
     results_info->top[i] = top;
