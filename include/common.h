@@ -56,7 +56,6 @@
 #define SECONDS_IN_HOUR 3600
 #define SECONDS_IN_MINUTE 60
 #define WAVHDR_DEBUG 1
-#define MAX_SIMULTANEOUS_JOBS 5
 #define FILE_DOES_NOT_EXIST 1
 
 typedef uint64_t u64;
@@ -84,46 +83,20 @@ typedef struct _classifyapp_struct_ {
   volatile int             input_thread_is_active;
   volatile int             proc_thread_is_active;
 
-  void                     *input_packet_queue;
-  sem_t                    *input_queue_sem;
-    
-  void                     *input_packet_buffer_pool;
-  sem_t                    *input_packet_sem;
-  
-  void                     *system_message_pool;
+  // void                     *system_message_pool;
 
   pthread_t                input_thread_id;
-  pthread_t                proc_thread_id;
+  // pthread_t                proc_thread_id;
 
   CURL                     *curl_data;
-  double                   bytes_pulled, bytes_pushed, bytes_pulled_report;
+  double                   bytes_pulled;
   double                   bytes_processed;
-  double                   input_mux_rate;
 
-  u64                      cur_input_packet_fill;
-  uint8_t                  *cur_input_packet;
-  
   pthread_mutex_t          http_input_thread_complete_mutex;
   bool                     http_input_thread_complete;
 
-  uint64_t                 decoded_frame_count;
-  uint64_t                 decoded_total_bytes;
-
-  int64_t                  output_bit_rate;
-
-  struct timespec          pull_start_timestamp;
-  int64_t                  pull_start_ts_high, pull_start_ts_low, pull_end_ts_high, pull_end_ts_low;
-
-  void                     *event_message_queue;
-  void                     *event_message_pool;
-  
-  igolgi_message_struct    *cur_message_wrapper;
-
   char                     *restful_err_str;
-
-  uint64_t                 decoded_audio_pkts;
-  uint16_t                 consecutive_audio_decode_failures; // on URL retry, ffmpeg sometimes goes into infinite loop where packets get pulled but not decoded
-
+  
   FILE                     *samplefptr;
 
 } classifyapp_struct;

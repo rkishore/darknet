@@ -45,7 +45,7 @@ extern void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 				      struct detection_results *results_info);
 extern void free_detector_internal_datastructures(struct prep_network_info *prep_netinfo);
 
-classifyapp_struct classifyapp_inst;
+// classifyapp_struct classifyapp_inst[MAX_MESSAGES_PER_WINDOW];
 struct sigaction sa;
 
 void handle_signal(int signal)
@@ -238,18 +238,18 @@ static int check_input_url(restful_comm_struct *restful_ptr)
 
   int typecheck = -1, retval = 0;
   char *samplefilename = NULL;
-  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
+  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + restful_ptr->cur_classify_info.classify_id);
 
   if (get_config()->fastmode == false)
     {
-      if (config_curl_and_pull_file_sample(restful_ptr->classifyapp_data) < 0)
+      if (config_curl_and_pull_file_sample(cur_classifyapp_data) < 0)
 	{
 	  syslog(LOG_ERR, "= Could not check file for file type from input_url, %s:%d", __FILE__, __LINE__);
 	  retval = -1;
 	  goto exit_check_input_url;
 	}    
 
-      if (asprintf(&samplefilename, "%s/%s", restful_ptr->classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
+      if (asprintf(&samplefilename, "%s/%s", cur_classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
 	{
 	  syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
 	  retval = -1;
@@ -357,7 +357,7 @@ static int check_output_dir(restful_comm_struct *restful_ptr)
 static int check_input_file(restful_comm_struct *restful_ptr) 
 {
 
-  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
+  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + restful_ptr->cur_classify_info.classify_id);
     
   // Check if input file exists 
   if ( access(get_config()->image_url, F_OK ) == -1 ) {
@@ -428,7 +428,7 @@ static int check_config(restful_comm_struct *restful_ptr)
 
 static int check_input_params_for_sanity(restful_comm_struct *restful_ptr) 
 {
-  classifyapp_struct *cur_classifyapp_data = restful_ptr->classifyapp_data;
+  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + restful_ptr->cur_classify_info.classify_id);
   
   if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "stream")) && (check_input_url(restful_ptr) < 0))
     {
@@ -462,7 +462,7 @@ static int check_input_params_for_sanity(restful_comm_struct *restful_ptr)
 static void *restful_classify_thread_func(void *context)
 {
   restful_comm_struct *restful = (restful_comm_struct *)context;
-  classifyapp_struct *classifyapp_info = restful->classifyapp_data;
+  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + restful->cur_classify_info.classify_id);
   int done_handling_req = 0, i = 0;
   bool continue_after_params_parsing = false;
   struct prep_network_info prep_netinfo_inst;
@@ -483,7 +483,9 @@ static void *restful_classify_thread_func(void *context)
     continue_after_params_parsing = false;
     while (!done_handling_req) {
 
-      igolgi_message_struct *dispatch_msg = (igolgi_message_struct*)message_queue_pop_back(restful->dispatch_queue);
+      // igolgi_message_struct *dispatch_msg = (igolgi_message_struct*)message_queue_pop_back(restful->dispatch_queue);
+      igolgi_message_struct *dispatch_msg = NULL;
+      
       if (!dispatch_msg) {
 	  
 	if (!restful->is_classify_thread_active)
@@ -502,9 +504,9 @@ static void *restful_classify_thread_func(void *context)
       dispatch_msg = NULL;
       
       syslog(LOG_DEBUG, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_filepath: %s",
-	     classifyapp_info->appconfig.input_url, 
-	     classifyapp_info->appconfig.output_directory,
-	     classifyapp_info->appconfig.output_filepath);
+	     cur_classifyapp_data->appconfig.input_url, 
+	     cur_classifyapp_data->appconfig.output_directory,
+	     cur_classifyapp_data->appconfig.output_filepath);
 
       // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
       if (check_input_params_for_sanity(restful) == 0)
@@ -534,9 +536,9 @@ static void *restful_classify_thread_func(void *context)
     if (continue_after_params_parsing == false)
       continue;      
 
-    if (!strcmp(restful->classifyapp_data->appconfig.input_type, "stream"))
+    if (!strcmp(cur_classifyapp_data->appconfig.input_type, "stream"))
       {
-	if (config_curl_and_pull_file(classifyapp_info) < 0)
+	if (config_curl_and_pull_file(cur_classifyapp_data) < 0)
 	  {
 	    syslog(LOG_ERR, "= Could not config. curl and pull file, %s:%d", __FILE__, __LINE__);
 	    pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
@@ -548,21 +550,21 @@ static void *restful_classify_thread_func(void *context)
       }
     else
       {
-	memset(restful->classifyapp_data->appconfig.input_filename, 0, LARGE_FIXED_STRING_SIZE);
-	snprintf(restful->classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "%s", get_config()->image_url);
+	memset(cur_classifyapp_data->appconfig.input_filename, 0, LARGE_FIXED_STRING_SIZE);
+	snprintf(cur_classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "%s", get_config()->image_url);
       }
 
-    if (!strcmp(restful->classifyapp_data->appconfig.input_mode, "image"))
+    if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
       {
-	syslog(LOG_DEBUG, "= About to run the detect+classify for %s: %s, %s:%d", restful->classifyapp_data->appconfig.input_mode,
-	       restful->classifyapp_data->appconfig.input_filename,
+	syslog(LOG_DEBUG, "= About to run the detect+classify for %s: %s, %s:%d", cur_classifyapp_data->appconfig.input_mode,
+	       cur_classifyapp_data->appconfig.input_filename,
 	       __FILE__, __LINE__);
   
 	run_detector_custom(&prep_netinfo_inst,
-			    restful->classifyapp_data->appconfig.input_filename,
-			    restful->classifyapp_data->appconfig.detection_threshold,
+			    cur_classifyapp_data->appconfig.input_filename,
+			    cur_classifyapp_data->appconfig.detection_threshold,
 			    .5,
-			    restful->classifyapp_data->appconfig.output_filepath,
+			    cur_classifyapp_data->appconfig.output_filepath,
 			    0,
 			    &restful->cur_classify_info.results_info);
 	
@@ -572,7 +574,7 @@ static void *restful_classify_thread_func(void *context)
 	   test_detector("/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
 	   "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.cfg",
 	   "/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/yolov3-tiny.weights",
-	   restful->classifyapp_data->appconfig.input_filename,
+	   cur_classifyapp_data->appconfig.input_filename,
 	   0.5,
 	   .5,
 	   "/tmp/predictions.png",
@@ -608,16 +610,16 @@ static void *restful_classify_thread_func(void *context)
       {
 
 	syslog(LOG_INFO, "= Detect+classify for %s: %s, %s:%d",
-	       restful->classifyapp_data->appconfig.input_mode,
-	       restful->classifyapp_data->appconfig.input_filename,
+	       cur_classifyapp_data->appconfig.input_mode,
+	       cur_classifyapp_data->appconfig.input_filename,
 	       __FILE__, __LINE__);
 
 	run_detector_custom_video(&prep_netinfo_inst,
-				  restful->classifyapp_data->appconfig.input_filename,
-				  restful->classifyapp_data->appconfig.detection_threshold,
+				  cur_classifyapp_data->appconfig.input_filename,
+				  cur_classifyapp_data->appconfig.detection_threshold,
 				  .5,
-				  restful->classifyapp_data->appconfig.output_filepath,
-				  restful->classifyapp_data->appconfig.output_json_filepath,
+				  cur_classifyapp_data->appconfig.output_filepath,
+				  cur_classifyapp_data->appconfig.output_json_filepath,
 				  &restful->cur_classify_info.results_info);
 
 	syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
@@ -661,9 +663,9 @@ int restful_classify_thread_stop(restful_comm_struct *restful)
 
 int main(int argc, char **argv)
 {
-
+  
   fprintf(stdout, "Classify REST daemon (C) Copyright 2018-2019 igolgi Inc.\n");
-  fprintf(stdout, "\nRELEASE: FEB 2019\n\n");
+  fprintf(stdout, "\nRELEASE: MAR 2019\n\n");
 
   basic_initialization(&argc, argv, "classifyapp");
 
@@ -681,7 +683,7 @@ int main(int argc, char **argv)
      If the request is a valid one, then send it via msg. queue to the 
      1st classifier thread
   */  
-  restful_comm_thread_start(&classifyapp_inst, &restful_struct, &restful_dispatch_queue, (int *)&get_config()->daemon_port);
+  restful_comm_thread_start(&restful_struct, &restful_dispatch_queue, (int *)&get_config()->daemon_port);
 
   // Thread to pull and classify files when requested by clients
   restful_classify_thread_start(restful_struct);
@@ -719,8 +721,7 @@ int main(int argc, char **argv)
   pthread_join(restful_struct->restful_server_thread_id, NULL);
   message_queue_destroy(restful_struct->dispatch_queue);
   
-  syslog(LOG_INFO, "= CLASSIFYAPP DONE FOR URL: %s | processed: %0.0f bytes\n",
-	 get_config()->image_url, classifyapp_inst.bytes_processed);
+  syslog(LOG_INFO, "= CLASSIFYAPP EXITING");
   
   return 0;
 }

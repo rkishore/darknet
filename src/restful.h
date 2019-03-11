@@ -7,6 +7,7 @@
 
 #define MAX_DETECTIONS_PER_IMAGE 16
 #define MAX_LABEL_STRING_SIZE 128
+#define MAX_MESSAGES_PER_WINDOW 2
 
 struct detection_results {
 
@@ -42,9 +43,6 @@ typedef struct _classify_job_info_ {
   int                classify_status;
   pthread_mutex_t    job_status_lock;
 
-  float              percentage_finished;
-  pthread_mutex_t    job_percent_complete_lock;
-
   struct timespec    start_timestamp, end_timestamp;
 
   struct detection_results results_info;
@@ -60,7 +58,7 @@ typedef struct _restful_comm_struct_ {
     void               *dispatch_queue;
 
     pthread_mutex_t    *classifyapp_data_lock;
-    classifyapp_struct    *classifyapp_data;
+    classifyapp_struct *classifyapp_data;
 
     /*
     bool               classifyapp_init;
@@ -76,6 +74,10 @@ typedef struct _restful_comm_struct_ {
     pthread_t          classify_thread_id;
     volatile int       is_classify_thread_active;
 
+    int                next_post_classify_id, get_request_classify_id;
+    pthread_mutex_t    next_post_id_lock;
+    
+  
 } restful_comm_struct;
 
 enum {
@@ -108,11 +110,11 @@ enum {
 extern "C" {
 #endif
 
-  restful_comm_struct *restful_comm_create(classifyapp_struct *classifyapp, int *server_port);
+  restful_comm_struct *restful_comm_create(int *server_port);
   int restful_comm_destroy(restful_comm_struct *restful);
   int restful_comm_start(restful_comm_struct *restful, void *dispatch_queue);
   int restful_comm_stop(restful_comm_struct *restful);
-  int restful_comm_thread_start(classifyapp_struct *classifyapp_data, restful_comm_struct **restful, void **dispatch_queue, int *server_port);
+  int restful_comm_thread_start(restful_comm_struct **restful, void **dispatch_queue, int *server_port);
   char *file_extension(char *filename);
   int restful_classify_thread_start(restful_comm_struct *restful);
   int restful_classify_thread_stop(restful_comm_struct *restful);
