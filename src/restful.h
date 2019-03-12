@@ -3,52 +3,6 @@
 
 #include "common.h"
 
-#define START_CLASSIFY_ID 0
-
-#define MAX_DETECTIONS_PER_IMAGE 16
-#define MAX_LABEL_STRING_SIZE 128
-#define MAX_MESSAGES_PER_WINDOW 2
-
-struct detection_results {
-
-  int num_labels_detected;
-  
-  char labels[MAX_DETECTIONS_PER_IMAGE][MAX_LABEL_STRING_SIZE];
-
-  float confidence[MAX_DETECTIONS_PER_IMAGE];
-
-  float processing_time_in_seconds;
-  volatile float percentage_completed;
-
-  int top_left_x[MAX_DETECTIONS_PER_IMAGE];
-  int top_left_y[MAX_DETECTIONS_PER_IMAGE];
-  int top_right_x[MAX_DETECTIONS_PER_IMAGE];
-  int top_right_y[MAX_DETECTIONS_PER_IMAGE];
-  int bottom_left_x[MAX_DETECTIONS_PER_IMAGE];
-  int bottom_left_y[MAX_DETECTIONS_PER_IMAGE];
-  int bottom_right_x[MAX_DETECTIONS_PER_IMAGE];
-  int bottom_right_y[MAX_DETECTIONS_PER_IMAGE];
-
-  int left[MAX_DETECTIONS_PER_IMAGE];
-  int right[MAX_DETECTIONS_PER_IMAGE];
-  int top[MAX_DETECTIONS_PER_IMAGE];
-  int bottom[MAX_DETECTIONS_PER_IMAGE];
-  
-};
-
-typedef struct _classify_job_info_ {
-
-  int                classify_id;
-
-  int                classify_status;
-  pthread_mutex_t    job_status_lock;
-
-  struct timespec    start_timestamp, end_timestamp;
-
-  struct detection_results results_info;
-  
-} classify_job_info;
-
 typedef struct _restful_comm_struct_ {
 
     pthread_t          restful_server_thread_id;
@@ -65,8 +19,8 @@ typedef struct _restful_comm_struct_ {
     pthread_mutex_t    classifyapp_init_lock;
     */
   
-    classify_job_info cur_classify_info;
-    pthread_mutex_t    classify_info_lock;
+    //classify_job_info cur_classify_info;
+    //pthread_mutex_t    classify_info_lock;
 
     int                classify_thread_status;
     pthread_mutex_t    thread_status_lock;
@@ -74,8 +28,8 @@ typedef struct _restful_comm_struct_ {
     pthread_t          classify_thread_id;
     volatile int       is_classify_thread_active;
 
-    int                next_post_classify_id, get_request_classify_id;
-    pthread_mutex_t    next_post_id_lock;
+    int                next_post_classify_id, get_request_classify_id, cur_process_classify_id;
+    pthread_mutex_t    next_post_id_lock, cur_process_id_lock;
     
   
 } restful_comm_struct;

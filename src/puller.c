@@ -193,10 +193,11 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
 
   curl_easy_cleanup(classifyapp_data->curl_data);
 
-  pthread_mutex_lock(&classifyapp_data->http_input_thread_complete_mutex);
+  /* pthread_mutex_lock(&classifyapp_data->http_input_thread_complete_mutex);
   classifyapp_data->http_input_thread_complete = true;
   pthread_mutex_unlock(&classifyapp_data->http_input_thread_complete_mutex);
-
+  */
+  
   return retval;
   
 }
@@ -285,6 +286,9 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
   
 }
 
+/* 
+   Use if splitting out puller as a separate thread
+
 void *http_input_thread_func(void *arg)
 {
   // int retval = -1;
@@ -300,4 +304,4 @@ void *http_input_thread_func(void *arg)
   syslog(LOG_INFO, "= Leaving puller_thread, line %d in %s", __LINE__, __FILE__);
   return NULL;
 
-}
+  } */

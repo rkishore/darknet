@@ -58,6 +58,12 @@
 #define WAVHDR_DEBUG 1
 #define FILE_DOES_NOT_EXIST 1
 
+#define START_CLASSIFY_ID 0
+
+#define MAX_DETECTIONS_PER_IMAGE 16
+#define MAX_LABEL_STRING_SIZE 128
+#define MAX_MESSAGES_PER_WINDOW 2
+
 typedef uint64_t u64;
 typedef int64_t i64;
 typedef unsigned int u32;
@@ -76,29 +82,75 @@ typedef struct _classifyapp_config_struct_ {
   
 } classifyapp_config_struct;
 
+struct detection_results {
+
+  int num_labels_detected;
+  
+  char labels[MAX_DETECTIONS_PER_IMAGE][MAX_LABEL_STRING_SIZE];
+
+  float confidence[MAX_DETECTIONS_PER_IMAGE];
+
+  float processing_time_in_seconds;
+  volatile float percentage_completed;
+
+  int top_left_x[MAX_DETECTIONS_PER_IMAGE];
+  int top_left_y[MAX_DETECTIONS_PER_IMAGE];
+  int top_right_x[MAX_DETECTIONS_PER_IMAGE];
+  int top_right_y[MAX_DETECTIONS_PER_IMAGE];
+  int bottom_left_x[MAX_DETECTIONS_PER_IMAGE];
+  int bottom_left_y[MAX_DETECTIONS_PER_IMAGE];
+  int bottom_right_x[MAX_DETECTIONS_PER_IMAGE];
+  int bottom_right_y[MAX_DETECTIONS_PER_IMAGE];
+
+  int left[MAX_DETECTIONS_PER_IMAGE];
+  int right[MAX_DETECTIONS_PER_IMAGE];
+  int top[MAX_DETECTIONS_PER_IMAGE];
+  int bottom[MAX_DETECTIONS_PER_IMAGE];
+  
+};
+
+typedef struct _classify_job_info_ {
+
+  int                classify_id;
+
+  int                classify_status;
+  pthread_mutex_t    job_status_lock;
+
+  struct timespec    start_timestamp, end_timestamp;
+
+  struct detection_results results_info;
+  
+} classify_job_info;
+
 typedef struct _classifyapp_struct_ {
 
+  // Config for this request
   classifyapp_config_struct   appconfig;
 
-  volatile int             input_thread_is_active;
-  volatile int             proc_thread_is_active;
+  // volatile int             input_thread_is_active;
+  // volatile int             proc_thread_is_active;
 
   // void                     *system_message_pool;
 
-  pthread_t                input_thread_id;
+  // pthread_t                input_thread_id;
   // pthread_t                proc_thread_id;
 
-  CURL                     *curl_data;
-  double                   bytes_pulled;
-  double                   bytes_processed;
+  CURL                        *curl_data;
+  double                      bytes_pulled;
+  // double                   bytes_processed;
 
-  pthread_mutex_t          http_input_thread_complete_mutex;
-  bool                     http_input_thread_complete;
+  // Use if puller is in a separate thread
+  // pthread_mutex_t          http_input_thread_complete_mutex;
+  // bool                     http_input_thread_complete;
 
-  char                     *restful_err_str;
+  char                        *restful_err_str; // To store error string info. for this REST request
   
-  FILE                     *samplefptr;
+  FILE                        *samplefptr; // To use while pulling down a sample of the input and checking it for sanity
+  
+  classify_job_info           cur_classify_info;
+  //pthread_mutex_t    classify_info_lock;
 
+  
 } classifyapp_struct;
 
 #define __PRINTF(fmt, args...) { fprintf(stdout, fmt , ## args); fflush(stdout); }

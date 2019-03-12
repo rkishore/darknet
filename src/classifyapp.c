@@ -84,101 +84,6 @@ void handle_signal(int signal)
   
 }
 
-
-/* 
-static int stop_classifyapp_config(classifyapp_struct *classifyapp_data)
-{
-  // bool audio_thread_complete = false, speech_thread_complete = false;
-
-  // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
-
-  classifyapp_data->proc_thread_is_active = 0;
-  classifyapp_data->input_thread_is_active = 0;
-
-  // pthread_join(classifyapp_data->proc_thread_id, NULL);
-
-  // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
-
-  pthread_join(classifyapp_data->input_thread_id, NULL);
-
-
-  //fast_buffer_pool_destroy(classifyapp_data->system_message_pool);
-  //classifyapp_data->system_message_pool = NULL;
-
-  pthread_mutex_destroy(&classifyapp_data->http_input_thread_complete_mutex);
-  
-  //if (classifyapp_data->event_message_queue) {
-  //  message_queue_destroy(classifyapp_data->event_message_queue);
-  //  classifyapp_data->event_message_queue = NULL;
-  //}
-  //if (classifyapp_data->event_message_pool) {
-  //  buffer_pool_destroy(classifyapp_data->event_message_pool);
-  //  classifyapp_data->event_message_pool = NULL;
-  //}
-  
-  // remove_files_used_to_recover_from_crash();  
-
-  return 0;
-}
-
-static int start_classifyapp_config(restful_comm_struct *restful_data)
-{
-  int retval; //, sval1, sval2;
-  classifyapp_struct *classifyapp_data = restful_data->classifyapp_data;
-  
-  // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
-  memset(classifyapp_data, 0, sizeof(classifyapp_struct));
-
-  classifyapp_data->proc_thread_is_active = 1;
-  classifyapp_data->input_thread_is_active = 1;
-
-  // Message queue and packet semaphores between audio_decoder thread and speech_processing thread
-  //classifyapp_data->speech_proc_queue_sem = (sem_t*)malloc(sizeof(sem_t));
-  //classifyapp_data->speech_proc_packet_sem = (sem_t*)malloc(sizeof(sem_t));
-  //sem_init(classifyapp_data->speech_proc_queue_sem, 0, 0);
-  //sem_init(classifyapp_data->speech_proc_packet_sem, 0, MAX_PACKETS);
-    
-  
-  // Message queue and packet buffer pool between audio_decoder thread and speech_processing thread
-  //classifyapp_data->speech_proc_packet_queue = (void*)message_queue_create();
-  //classifyapp_data->speech_proc_packet_buffer_pool = (void*)fast_buffer_pool_create(MAX_PACKETS, MAX_WAV_PACKET_SIZE);
-  
-  // Common buffer pool for http_puller thread & audio_decoder thread
-  // classifyapp_data->system_message_pool = (void*)fast_buffer_pool_create(MAX_PACKETS * NUM_PROC_THREADS, sizeof(igolgi_message_struct));
-
-
-#ifdef SELF_PULL
-  // classifyapp_data->audio_decoder_buffer_pool = (void*)fast_buffer_pool_create(1, MAX_PACKET_SIZE*2);
-  pthread_mutex_init(&classifyapp_data->http_input_thread_complete_mutex, NULL);
-  classifyapp_data->http_input_thread_complete = false;
-#endif
-
-  //pthread_mutex_init(&classifyapp_data->audio_decoder_thread_complete_mutex, NULL);
-  //pthread_mutex_init(&classifyapp_data->speech_proc_thread_complete_mutex, NULL);
-  //classifyapp_data->audio_decoder_thread_complete = false;
-  //classifyapp_data->speech_proc_thread_complete = false;
-  
-  //classifyapp_data->event_message_queue = (void*)message_queue_create();
-  //classifyapp_data->event_message_pool = (void*)buffer_pool_create(MAX_EVENT_BUFFERS, MAX_EVENT_SIZE, 1);  
-
-
-  // Thread that pulls from URL
-  retval = pthread_create(&classifyapp_data->input_thread_id, NULL, http_input_thread_func, (void*)classifyapp_data);
-  if (retval < 0) {
-
-    classifyapp_data->proc_thread_is_active = 0;
-    classifyapp_data->input_thread_is_active = 0;
-
-    // sem post?                                                                                                                                                 
-    fprintf(stderr,"Unable to start http input thread!\n");
-    return -1;
-
-  } 
-    
-  return 0;
-}
-*/
-
 static int check_file_type(char *filepath, char *filetype_to_check)
 {
   char *filecmd = NULL;
@@ -236,9 +141,18 @@ static int fill_input_mode_based_on_file_type(classifyapp_struct *classifyapp_da
 static int check_input_url(restful_comm_struct *restful_ptr) 
 {
 
-  int typecheck = -1, retval = 0;
+  int typecheck = -1, retval = 0, next_post_id = -1;
   char *samplefilename = NULL;
-  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + restful_ptr->cur_classify_info.classify_id);
+  classifyapp_struct *cur_classifyapp_data = NULL;
+
+  pthread_mutex_lock(&restful_ptr->next_post_id_lock);
+  next_post_id = restful_ptr->next_post_classify_id;
+  pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
+
+  if (next_post_id >= 0)
+    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data); 
+  else
+    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
 
   if (get_config()->fastmode == false)
     {
@@ -342,12 +256,24 @@ static int check_input_url(restful_comm_struct *restful_ptr)
 static int check_output_dir(restful_comm_struct *restful_ptr) 
 {
 
+  int next_post_id = -1;
+  classifyapp_struct *cur_classifyapp_data = NULL;
+  
+  pthread_mutex_lock(&restful_ptr->next_post_id_lock);
+  next_post_id = restful_ptr->next_post_classify_id;
+  pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
+
+  if (next_post_id >= 0)
+    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data); 
+  else
+    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
+
   // Check if directory exists 
   if ( access(get_config()->output_directory, F_OK ) == -1 ) {
     syslog(LOG_ERR, "= Output directory %s does not exist", get_config()->output_directory);
-    pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
-    restful_ptr->cur_classify_info.classify_status = CLASSIFY_STATUS_OUTPUT_ERROR;
-    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);
+    pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+    cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_OUTPUT_ERROR;
+    pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
     return -1;	  	
   }
 
@@ -357,14 +283,24 @@ static int check_output_dir(restful_comm_struct *restful_ptr)
 static int check_input_file(restful_comm_struct *restful_ptr) 
 {
 
-  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + restful_ptr->cur_classify_info.classify_id);
+  int next_post_id = -1;
+  classifyapp_struct *cur_classifyapp_data = NULL;
+  
+  pthread_mutex_lock(&restful_ptr->next_post_id_lock);
+  next_post_id = restful_ptr->next_post_classify_id;
+  pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
+
+  if (next_post_id >= 0)
+    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data); 
+  else
+    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
     
   // Check if input file exists 
   if ( access(get_config()->image_url, F_OK ) == -1 ) {
     syslog(LOG_ERR, "= Input file %s does not exist", get_config()->image_url);
-    pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
-    restful_ptr->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
-    pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
+    pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+    cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
+    pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);    
     return -1;	  	
   }
 
@@ -375,9 +311,9 @@ static int check_input_file(restful_comm_struct *restful_ptr)
 	{
 
 	  syslog(LOG_ERR, "= Input's %s mode could not be determined, %s: %d", get_config()->image_url, __FILE__, __LINE__);
-	  pthread_mutex_lock(&restful_ptr->cur_classify_info.job_status_lock);
-	  restful_ptr->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
-	  pthread_mutex_unlock(&restful_ptr->cur_classify_info.job_status_lock);    
+	  pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	  cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
+	  pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);    
 	  return -1;
 	  
 	}
@@ -428,7 +364,17 @@ static int check_config(restful_comm_struct *restful_ptr)
 
 static int check_input_params_for_sanity(restful_comm_struct *restful_ptr) 
 {
-  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + restful_ptr->cur_classify_info.classify_id);
+  int next_post_id = -1;
+  classifyapp_struct *cur_classifyapp_data = NULL;
+  
+  pthread_mutex_lock(&restful_ptr->next_post_id_lock);
+  next_post_id = restful_ptr->next_post_classify_id;
+  pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
+
+  if (next_post_id >= 0)
+    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data); 
+  else
+    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
   
   if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "stream")) && (check_input_url(restful_ptr) < 0))
     {
@@ -462,12 +408,20 @@ static int check_input_params_for_sanity(restful_comm_struct *restful_ptr)
 static void *restful_classify_thread_func(void *context)
 {
   restful_comm_struct *restful = (restful_comm_struct *)context;
-  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + restful->cur_classify_info.classify_id);
-  int done_handling_req = 0, i = 0;
+  int done_handling_req = 0, i = 0, next_post_id = -1;
   bool continue_after_params_parsing = false;
   struct prep_network_info prep_netinfo_inst;
+  classifyapp_struct *cur_classifyapp_data = NULL;
+  int cur_dispatch_queue_size = -1, cur_classify_thread_status;
+  igolgi_message_struct *dispatch_msg = NULL;
+  
+  // Initialization
+  for (i = 0; i<MAX_MESSAGES_PER_WINDOW; i++)
+    {
+      cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + i);
+      memset(&cur_classifyapp_data->cur_classify_info.results_info, 0, sizeof(struct detection_results));
+    }
 
-  memset(&restful->cur_classify_info.results_info, 0, sizeof(struct detection_results));
   prepare_detector_custom(&prep_netinfo_inst,
 			  (char *)get_config()->dnn_data_file,
 			  (char *)get_config()->dnn_config_file,
@@ -483,8 +437,31 @@ static void *restful_classify_thread_func(void *context)
     continue_after_params_parsing = false;
     while (!done_handling_req) {
 
-      // igolgi_message_struct *dispatch_msg = (igolgi_message_struct*)message_queue_pop_back(restful->dispatch_queue);
-      igolgi_message_struct *dispatch_msg = NULL;
+      // Check here? or rely on process thread to mark BUSY signal?
+      cur_dispatch_queue_size = message_queue_count(restful->dispatch_queue);
+      pthread_mutex_lock(&restful->thread_status_lock);
+      cur_classify_thread_status = restful->classify_thread_status;
+      pthread_mutex_unlock(&restful->thread_status_lock);	      
+
+      if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_IDLE) && (cur_dispatch_queue_size > (MAX_MESSAGES_PER_WINDOW-1) ) )
+	{
+	  syslog(LOG_INFO, "= SETTING THREAD_STATUS TO BUSY, Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
+	  pthread_mutex_lock(&restful->thread_status_lock);
+	  restful->classify_thread_status = CLASSIFY_THREAD_STATUS_BUSY;
+	  cur_classify_thread_status = restful->classify_thread_status;
+	  pthread_mutex_unlock(&restful->thread_status_lock);	      
+	}
+
+      if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_BUSY) && (cur_dispatch_queue_size < MAX_MESSAGES_PER_WINDOW) )
+	{
+	  syslog(LOG_INFO, "= SETTING THREAD_STATUS TO IDLE, Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
+	  pthread_mutex_lock(&restful->thread_status_lock);
+	  restful->classify_thread_status = CLASSIFY_THREAD_STATUS_IDLE;
+	  cur_classify_thread_status = restful->classify_thread_status;
+	  pthread_mutex_unlock(&restful->thread_status_lock);	      
+	}
+
+      // dispatch_msg = (igolgi_message_struct*)message_queue_pop_back(restful->dispatch_queue);
       
       if (!dispatch_msg) {
 	  
@@ -502,7 +479,16 @@ static void *restful_classify_thread_func(void *context)
       //fprintf(stderr, "RECEIVED DISPATCH_MSG: %d\n", dispatch_msg->buffer_flags);	  	    
       free(dispatch_msg);
       dispatch_msg = NULL;
-      
+
+      pthread_mutex_lock(&restful->next_post_id_lock);
+      next_post_id = restful->next_post_classify_id;
+      pthread_mutex_unlock(&restful->next_post_id_lock);
+
+      if (next_post_id >= 0)
+	cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data); 
+      else
+	cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + (next_post_id-1)); 
+
       syslog(LOG_DEBUG, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_filepath: %s",
 	     cur_classifyapp_data->appconfig.input_url, 
 	     cur_classifyapp_data->appconfig.output_directory,
@@ -519,10 +505,10 @@ static void *restful_classify_thread_func(void *context)
       else
 	{
 	  continue_after_params_parsing = false;
-	  pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
-	  restful->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
-	  pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
-	  clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
+	  pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	  cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
+	  pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	  clock_gettime(CLOCK_REALTIME, &cur_classifyapp_data->cur_classify_info.end_timestamp);
 	} 
       
       done_handling_req = 1;
@@ -541,17 +527,17 @@ static void *restful_classify_thread_func(void *context)
 	if (config_curl_and_pull_file(cur_classifyapp_data) < 0)
 	  {
 	    syslog(LOG_ERR, "= Could not config. curl and pull file, %s:%d", __FILE__, __LINE__);
-	    pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
-	    restful->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
-	    pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
-	    clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
+	    pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	    cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
+	    pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	    clock_gettime(CLOCK_REALTIME, &cur_classifyapp_data->cur_classify_info.end_timestamp);
 	    continue;
 	  }
       }
     else
       {
 	memset(cur_classifyapp_data->appconfig.input_filename, 0, LARGE_FIXED_STRING_SIZE);
-	snprintf(cur_classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "%s", get_config()->image_url);
+	snprintf(cur_classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "%s", cur_classifyapp_data->appconfig.input_url);
       }
 
     if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
@@ -566,7 +552,7 @@ static void *restful_classify_thread_func(void *context)
 			    .5,
 			    cur_classifyapp_data->appconfig.output_filepath,
 			    0,
-			    &restful->cur_classify_info.results_info);
+			    &cur_classifyapp_data->cur_classify_info.results_info);
 	
 	syslog(LOG_INFO, "= Done with detect+classify, %s:%d", __FILE__, __LINE__);
 	
@@ -582,28 +568,28 @@ static void *restful_classify_thread_func(void *context)
 	*/
 	
 	syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
-	clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
-	pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
-	restful->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
-	pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
+	clock_gettime(CLOCK_REALTIME, &cur_classifyapp_data->cur_classify_info.end_timestamp);
+	pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
+	pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
 
 	syslog(LOG_INFO, "= Num. labels detected: %d in time: %0.2f milliseconds",
-	       restful->cur_classify_info.results_info.num_labels_detected,
-	       restful->cur_classify_info.results_info.processing_time_in_seconds * 1000.0);
+	       cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected,
+	       cur_classifyapp_data->cur_classify_info.results_info.processing_time_in_seconds * 1000.0);
 
-	for (i = 0; i<restful->cur_classify_info.results_info.num_labels_detected; i++)
+	for (i = 0; i<cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected; i++)
 	  syslog(LOG_INFO, "= Label #: %d | name: %s | confidence: %0.2f%% | tl: (%d,%d), tr: (%d,%d), bl: (%d,%d), br: (%d,%d)",
 		 i,
-		 restful->cur_classify_info.results_info.labels[i],
-		 restful->cur_classify_info.results_info.confidence[i],
-		 restful->cur_classify_info.results_info.top_left_x[i],
-		 restful->cur_classify_info.results_info.top_left_y[i],
-		 restful->cur_classify_info.results_info.top_right_x[i],
-		 restful->cur_classify_info.results_info.top_right_y[i],
-		 restful->cur_classify_info.results_info.bottom_left_x[i],
-		 restful->cur_classify_info.results_info.bottom_left_y[i],
-		 restful->cur_classify_info.results_info.bottom_right_x[i],
-		 restful->cur_classify_info.results_info.bottom_right_y[i]);
+		 cur_classifyapp_data->cur_classify_info.results_info.labels[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.confidence[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.top_left_x[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.top_left_y[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.top_right_x[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.top_right_y[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.bottom_left_x[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.bottom_left_y[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.bottom_right_x[i],
+		 cur_classifyapp_data->cur_classify_info.results_info.bottom_right_y[i]);
 	
       }
     else
@@ -620,13 +606,13 @@ static void *restful_classify_thread_func(void *context)
 				  .5,
 				  cur_classifyapp_data->appconfig.output_filepath,
 				  cur_classifyapp_data->appconfig.output_json_filepath,
-				  &restful->cur_classify_info.results_info);
+				  &cur_classifyapp_data->cur_classify_info.results_info);
 
 	syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
-	clock_gettime(CLOCK_REALTIME, &restful->cur_classify_info.end_timestamp);
-	pthread_mutex_lock(&restful->cur_classify_info.job_status_lock);
-	restful->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
-	pthread_mutex_unlock(&restful->cur_classify_info.job_status_lock);
+	clock_gettime(CLOCK_REALTIME, &cur_classifyapp_data->cur_classify_info.end_timestamp);
+	pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
+	pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
 	
       }
   }
@@ -641,7 +627,7 @@ static void *restful_classify_thread_func(void *context)
 
 int restful_classify_thread_start(restful_comm_struct *restful)
 {
-  if (restful) {
+  if (restful) {    
     restful->is_classify_thread_active = 1;
     syslog(LOG_INFO, "= Creating classify_thread");
     pthread_create(&restful->classify_thread_id, NULL, restful_classify_thread_func, (void*)restful);
