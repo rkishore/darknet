@@ -548,7 +548,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
   /* 
   cur_dispatch_queue_size = message_queue_count(restful->dispatch_queue);
   syslog(LOG_INFO, "= Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
-  if (cur_dispatch_queue_size >= (MAX_MESSAGES_PER_WINDOW-1))
+  if (cur_dispatch_queue_size >= (get_config()->max_queue_length-1))
     {
       pthread_mutex_lock(&restful->thread_status_lock);
       restful->classify_thread_status = CLASSIFY_THREAD_STATUS_BUSY;
@@ -586,7 +586,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 
     if (local_next_post_id_rollover_done == true)
       {
-	if (cur_classifyapp_data->cur_classify_info.results_info.results_read == false)
+	if ( (get_config()->dont_overwrite_old_results_until_read == true) && (cur_classifyapp_data->cur_classify_info.results_info.results_read == false) )
 	  {
 	    syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503) as older results for ID %d have not yet been read, %s:%d", next_post_id, __FILE__, __LINE__);
 	    *return_http_flag = HTTP_503;
@@ -641,7 +641,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     *return_http_flag = HTTP_201;
 
     cur_classifyapp_data->cur_classify_info.classify_id = cur_classify_id;
-    cur_classify_id = (cur_classify_id + 1) % MAX_MESSAGES_PER_WINDOW;
+    cur_classify_id = (cur_classify_id + 1) % get_config()->max_queue_length;
 
     pthread_mutex_lock(&next_post_id_rollover_done_lock);
     local_next_post_id_rollover_done = next_post_id_rollover_done;
@@ -679,7 +679,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     //fprintf(stderr,"\n\n\n\ndecoded data\n");			    
 	    
   } else {
-    syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503), %s:%d", __FILE__, __LINE__);
+    syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503) as input queue is full, %s:%d", __FILE__, __LINE__);
     *return_http_flag = HTTP_503;
   }
   
@@ -809,7 +809,7 @@ static int parse_input_request_data(uint32_t **input_request_data,
       pthread_mutex_unlock(&next_post_id_rollover_done_lock);
 
       if ( (next_post_id == 0) || (local_next_post_id_rollover_done == true) )
-	next_post_id = MAX_MESSAGES_PER_WINDOW; 
+	next_post_id = get_config()->max_queue_length; 
       
       syslog(LOG_INFO, "GET %s | classify_id: %d/%d | restful_ptr: %p", uri, classify_id, next_post_id, restful_ptr);
       
@@ -1029,7 +1029,7 @@ static void get_response_for_post(restful_comm_struct *restful, cJSON **parsedjs
   pthread_mutex_unlock(&restful->next_post_id_lock);
 
   if (next_post_id == 0)
-    next_post_id = MAX_MESSAGES_PER_WINDOW;
+    next_post_id = get_config()->max_queue_length;
   
   cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + (next_post_id-1));
   
@@ -1292,7 +1292,7 @@ static void *restful_comm_thread_func(void *context)
 	    next_post_id = restful->next_post_classify_id;
 	    pthread_mutex_unlock(&restful->next_post_id_lock);
 	    if (next_post_id == 0)
-	      next_post_id = MAX_MESSAGES_PER_WINDOW;
+	      next_post_id = get_config()->max_queue_length;
 	    dispatch_msg->idx = next_post_id - 1;
 	    syslog(LOG_DEBUG, "= Sending dispatch msg: %d", http_response_status);
 	    message_queue_push_front(restful->dispatch_queue, dispatch_msg);
@@ -1304,7 +1304,7 @@ static void *restful_comm_thread_func(void *context)
 	    cur_classify_thread_status = restful->classify_thread_status;
 	    pthread_mutex_unlock(&restful->thread_status_lock);	      
 
-	    if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_IDLE) && (cur_dispatch_queue_size > (MAX_MESSAGES_PER_WINDOW-1) ) )
+	    if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_IDLE) && (cur_dispatch_queue_size > (get_config()->max_queue_length-1) ) )
 	      {
 		syslog(LOG_INFO, "= cur_busy_status: idle, dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
 		syslog(LOG_INFO, "= SETTING STATUS TO BUSY, Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
@@ -1350,15 +1350,15 @@ restful_comm_struct *restful_comm_create(int *server_port)
   //syslog(LOG_DEBUG, "CRASH FLAG: %d/%p | LINE: %d, %s", 
   //(int)classifyapp_data->appconfig.crash_recovery_flag, classifyapp_data, __LINE__, __FILE__);
 
-  restful->classifyapp_data = (classifyapp_struct *)malloc(sizeof(classifyapp_struct) * MAX_MESSAGES_PER_WINDOW);
+  restful->classifyapp_data = (classifyapp_struct *)malloc(sizeof(classifyapp_struct) * get_config()->max_queue_length);
   if (restful->classifyapp_data == NULL)
     {
       syslog(LOG_ERR, "= Could not allocate memory for critical struct, out of memory? Quitting");
       return NULL;
     }
-  memset(restful->classifyapp_data, 0, sizeof(classifyapp_struct) * MAX_MESSAGES_PER_WINDOW);
+  memset(restful->classifyapp_data, 0, sizeof(classifyapp_struct) * get_config()->max_queue_length);
 
-  for (i = 0; i<MAX_MESSAGES_PER_WINDOW; i++)
+  for (i = 0; i<get_config()->max_queue_length; i++)
     {
       cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + i);
       pthread_mutex_init(&cur_classifyapp_data->cur_classify_info.job_status_lock, NULL);
@@ -1386,7 +1386,7 @@ int restful_comm_destroy(restful_comm_struct *restful)
     pthread_mutex_destroy(&restful->next_post_id_lock);
     pthread_mutex_destroy(&restful->cur_process_id_lock);
 
-    for (i = 0; i<MAX_MESSAGES_PER_WINDOW; i++)
+    for (i = 0; i<get_config()->max_queue_length; i++)
       {
 	cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + i);
 	pthread_mutex_destroy(&cur_classifyapp_data->cur_classify_info.job_status_lock);

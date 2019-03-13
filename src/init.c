@@ -75,13 +75,15 @@ get_info_from_cmdline_args(int *argc, char **argv)
       {"log-level", required_argument, 0, 'L'},
       {"tmp-output-path", required_argument, 0, 'm'},
       {"fastmode", no_argument, 0, 'n'},
+      {"dont-overwrite-results", required_argument, 0, 'o'},
+      {"max-queue-length", required_argument, 0, 'p'},
       {"help", no_argument, 0, 'h' },
       {"version", no_argument, 0, 'v' },
       {0, 0, 0, 0 } // last element has to be filled with zeroes as per the man page
     };
 
     int option_index = 0;
-    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:L:m:nhv", 
+    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:L:m:o:p:nhv", 
 			long_options,
                         &option_index);
     int sizeof_char_ptr = sizeof(char *);
@@ -131,6 +133,12 @@ get_info_from_cmdline_args(int *argc, char **argv)
     case 'n':
       mod_config()->fastmode = true;
       break;
+    case 'o':
+      mod_config()->dont_overwrite_old_results_until_read = (bool)atoi(optarg);
+      break;
+    case 'p':      
+      mod_config()->max_queue_length = atoi(optarg);
+      break;      
     case 'h' :
     default :
       print_usage(argv[0]);
@@ -149,7 +157,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
       exit(EXIT_FAILURE);
     }
 
-  fprintf(stderr, "= CMDLINE args | dnn_data_file: %s | dnn_config_file: %s | dnn_weights_file: %s | detection_thresh: %0.1f | iface_name: %s | data_folder_path: %s\n",
+  fprintf(stderr, "= CMDLINE args 1 | dnn_data_file: %s | dnn_config_file: %s | dnn_weights_file: %s | detection_thresh: %0.1f | iface_name: %s | data_folder_path: %s\n",
 	  get_config()->dnn_data_file,
 	  get_config()->dnn_config_file,
 	  get_config()->dnn_weights_file,
@@ -157,6 +165,18 @@ get_info_from_cmdline_args(int *argc, char **argv)
 	  get_config()->interface_name,
 	  get_config()->data_folder_path);
 
+  fprintf(stderr, "= CMDLINE args 2 | max-queue-length: %d (default: %d) | dont_overwrite_results_flag: %d | fastmode: %d\n",
+	  get_config()->max_queue_length,
+	  (int)MAX_MESSAGES_PER_WINDOW,
+	  (int)get_config()->dont_overwrite_old_results_until_read,
+	  (int)get_config()->fastmode);
+  
+  if ( (get_config()->max_queue_length > MAX_ALLOWED_MESSAGES_PER_WINDOW) || (get_config()->max_queue_length < 1) )
+    {
+      fprintf(stderr, "= ERROR | invalid max_queue_length specified: %d (should be >= 1 and <= %d). Quitting.\n", get_config()->max_queue_length, (int)MAX_ALLOWED_MESSAGES_PER_WINDOW);
+      exit(-1);
+    }
+  
   return;
 }
 

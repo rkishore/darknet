@@ -34,7 +34,9 @@ struct Config
   char           *tmp_output_path;
   
   bool           fastmode; // avoid checking the input params if this is set to true
-  
+  int            max_queue_length; // max input request queue length
+  bool           dont_overwrite_old_results_until_read; // don't allow new POSTs to over-write old results until they are read by GET
+
 };
 
 const struct Config* get_config();

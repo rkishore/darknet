@@ -45,7 +45,6 @@ extern void run_detector_custom_video(struct prep_network_info *prep_netinfo,
 				      struct detection_results *results_info);
 extern void free_detector_internal_datastructures(struct prep_network_info *prep_netinfo);
 
-// classifyapp_struct classifyapp_inst[MAX_MESSAGES_PER_WINDOW];
 struct sigaction sa;
 
 void handle_signal(int signal)
@@ -150,7 +149,7 @@ static int check_input_url(restful_comm_struct *restful_ptr)
   next_post_id = restful_ptr->next_post_classify_id;
   pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
   if (next_post_id == 0)
-    next_post_id = MAX_MESSAGES_PER_WINDOW;
+    next_post_id = get_config()->max_queue_length;
   cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
 
   if (get_config()->fastmode == false)
@@ -262,7 +261,7 @@ static int check_output_dir(restful_comm_struct *restful_ptr)
   next_post_id = restful_ptr->next_post_classify_id;
   pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
   if (next_post_id == 0)
-    next_post_id = MAX_MESSAGES_PER_WINDOW;
+    next_post_id = get_config()->max_queue_length;
   cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
 
   // Check if directory exists 
@@ -287,7 +286,7 @@ static int check_input_file(restful_comm_struct *restful_ptr)
   next_post_id = restful_ptr->next_post_classify_id;
   pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
   if (next_post_id == 0)
-    next_post_id = MAX_MESSAGES_PER_WINDOW;
+    next_post_id = get_config()->max_queue_length;
   cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
     
   // Check if input file exists 
@@ -366,7 +365,7 @@ static int check_input_params_for_sanity(restful_comm_struct *restful_ptr)
   next_post_id = restful_ptr->next_post_classify_id;
   pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
   if (next_post_id == 0)
-    next_post_id = MAX_MESSAGES_PER_WINDOW;
+    next_post_id = get_config()->max_queue_length;
   cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
   
   if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "stream")) && (check_input_url(restful_ptr) < 0))
@@ -409,7 +408,7 @@ static void *restful_classify_thread_func(void *context)
   igolgi_message_struct *dispatch_msg = NULL;
   
   // Initialization
-  for (i = 0; i<MAX_MESSAGES_PER_WINDOW; i++)
+  for (i = 0; i<get_config()->max_queue_length; i++)
     {
       cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + i);
       memset(&cur_classifyapp_data->cur_classify_info.results_info, 0, sizeof(struct detection_results));
@@ -437,7 +436,7 @@ static void *restful_classify_thread_func(void *context)
       cur_classify_thread_status = restful->classify_thread_status;
       pthread_mutex_unlock(&restful->thread_status_lock);	      
 
-      if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_BUSY) && (cur_dispatch_queue_size < MAX_MESSAGES_PER_WINDOW) )
+      if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_BUSY) && (cur_dispatch_queue_size < get_config()->max_queue_length) )
 	{
 	  syslog(LOG_INFO, "= SETTING STATUS TO IDLE, Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
 	  pthread_mutex_lock(&restful->thread_status_lock);

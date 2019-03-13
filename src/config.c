@@ -56,7 +56,9 @@ void print_usage(const char *app_name)
   fprintf(stderr, "-i, --gpu-idx | In a multi-GPU system, selecting the GPU to run on | Default: %d\n", get_config()->gpu_idx);
   fprintf(stderr, "-L, --log-level | Set the syslog LOG LEVEL | Default: LOG_INFO (%s) \n", get_config()->debug_level);
   fprintf(stderr, "-n, --fastmode | Run faster by avoiding input_params check per image | Default: %d\n", (int)get_config()->fastmode);
-    
+  fprintf(stderr, "-o, --dont-overwrite-results | Don't over-write old results if new POSTs come in before the corresponding GET to read results | Default: %d\n", (int)get_config()->dont_overwrite_old_results_until_read);
+  fprintf(stderr, "-p, --max-queue-length | Maximum input queue length | Default: %d\n", get_config()->max_queue_length);
+  
   fprintf(stderr, "\n");
 
   return;
@@ -149,6 +151,8 @@ void fill_default_config()
   config->daemon_port = 55555;
   config->gpu_idx = -1;
   config->fastmode = false;
+  config->dont_overwrite_old_results_until_read = true;
+  config->max_queue_length = MAX_MESSAGES_PER_WINDOW;
   
   return;
   
