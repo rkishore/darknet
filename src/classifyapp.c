@@ -553,11 +553,12 @@ static void *restful_classify_thread_func(void *context)
 	cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
 	pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
 
-	syslog(LOG_INFO, "= ID: %d | Num. labels detected: %d in time: %0.2f milliseconds | %s",
+	syslog(LOG_INFO, "= ID: %d | Num. labels detected: %d in time: %0.2f milliseconds | %s | results_read: %d",
 	       cur_classifyapp_data->cur_classify_info.classify_id, 
 	       cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected,
 	       cur_classifyapp_data->cur_classify_info.results_info.processing_time_in_seconds * 1000.0,
-	       cur_classifyapp_data->appconfig.input_url);
+	       cur_classifyapp_data->appconfig.input_url,
+	       (int)cur_classifyapp_data->cur_classify_info.results_info.results_read);
 
 	for (i = 0; i<cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected; i++)
 	  syslog(LOG_INFO, "= ID: %d | Label #: %d | name: %s | confidence: %0.2f%% | tl: (%d,%d), tr: (%d,%d), bl: (%d,%d), br: (%d,%d)",

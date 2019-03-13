@@ -576,9 +576,32 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 	next_post_id = restful->next_post_classify_id;
 	pthread_mutex_unlock(&restful->next_post_id_lock);
       }
+
+    // Check if rollover of post_ids has happened
+    pthread_mutex_lock(&next_post_id_rollover_done_lock);
+    local_next_post_id_rollover_done = next_post_id_rollover_done;
+    pthread_mutex_unlock(&next_post_id_rollover_done_lock);
     
     cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + next_post_id);
-    
+
+    if (local_next_post_id_rollover_done == true)
+      {
+	if (cur_classifyapp_data->cur_classify_info.results_info.results_read == false)
+	  {
+	    syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503) as older results for ID %d have not yet been read, %s:%d", next_post_id, __FILE__, __LINE__);
+	    *return_http_flag = HTTP_503;
+	    return -1;
+	  }
+      }
+
+    // Re-initialize key values
+    memset(&cur_classifyapp_data->appconfig, 0, sizeof(classifyapp_config_struct));
+    memset(&cur_classifyapp_data->cur_classify_info, 0, sizeof(classify_job_info));
+    pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+    cur_classifyapp_data->cur_classify_info.classify_status = -1;
+    pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+    cur_classifyapp_data->bytes_pulled = 0;
+	
     //fprintf(stderr,"decoding data:%s\n", lineptr);
     input_data = cJSON_GetObjectItem(*parsedjson, "input");
     input_type_data = cJSON_GetObjectItem(*parsedjson, "type");
@@ -883,7 +906,13 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 
     cJSON_AddStringToObject(*response_json, "status", "finished");
     cJSON_AddNullToObject(*response_json, "error_msg");
-
+    if (cur_classifyapp_data->cur_classify_info.results_info.results_read == false)
+      {
+	syslog(LOG_INFO, "= Setting results_read to 1 for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id, __FILE__, __LINE__);
+	cur_classifyapp_data->cur_classify_info.results_info.results_read = true;
+      }
+    cJSON_AddNumberToObject(*response_json, "results_read", (int)cur_classifyapp_data->cur_classify_info.results_info.results_read);
+    
     if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
       {
 	cJSON_AddItemToObject(*response_json, "results", results_json=cJSON_CreateObject());
@@ -911,6 +940,7 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
 	  
 	bottom_array_json = cJSON_CreateIntArray((const int *)cur_classifyapp_data->cur_classify_info.results_info.bottom, cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected);
 	cJSON_AddItemToObject(results_json, "bottom", bottom_array_json);
+	
       }
     else
       {

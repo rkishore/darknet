@@ -106,6 +106,8 @@ struct detection_results {
   int right[MAX_DETECTIONS_PER_IMAGE];
   int top[MAX_DETECTIONS_PER_IMAGE];
   int bottom[MAX_DETECTIONS_PER_IMAGE];
+
+  bool results_read;
   
 };
 
