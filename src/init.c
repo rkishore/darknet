@@ -351,6 +351,9 @@ basic_initialization(int *argc, char **argv, char *identity)
     exit(-1);
   }
 
+  next_post_id_rollover_done = false;
+  pthread_mutex_init(&next_post_id_rollover_done_lock, NULL);
+  
   return;
 }
 

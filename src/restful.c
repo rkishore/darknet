@@ -541,7 +541,8 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
   cJSON *input_mode = NULL;
   classifyapp_struct *cur_classifyapp_data = NULL; 
   int cur_classify_thread_status = -1, next_post_id = -1;
- 
+  bool local_next_post_id_rollover_done = false;
+  
   // Check if a new POST can be handled or not
   // Check here? or rely on process thread to mark BUSY signal?
   /* 
@@ -619,16 +620,30 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     cur_classifyapp_data->cur_classify_info.classify_id = cur_classify_id;
     cur_classify_id = (cur_classify_id + 1) % MAX_MESSAGES_PER_WINDOW;
 
+    pthread_mutex_lock(&next_post_id_rollover_done_lock);
+    local_next_post_id_rollover_done = next_post_id_rollover_done;
+    pthread_mutex_unlock(&next_post_id_rollover_done_lock);
+    
     pthread_mutex_lock(&restful->next_post_id_lock);
     restful->next_post_classify_id = cur_classify_id;
+    next_post_id = restful->next_post_classify_id;
     pthread_mutex_unlock(&restful->next_post_id_lock);
-    
+
+    if ( (local_next_post_id_rollover_done == false) && (next_post_id == 0) )
+      {
+	pthread_mutex_lock(&next_post_id_rollover_done_lock);
+	next_post_id_rollover_done = true;
+	local_next_post_id_rollover_done = next_post_id_rollover_done;
+	pthread_mutex_unlock(&next_post_id_rollover_done_lock);
+	syslog(LOG_DEBUG, "= next_post_id rollover done? %d, %s:%d", (int)local_next_post_id_rollover_done, __FILE__, __LINE__);
+      }
+
     pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
     cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_RUNNING;
     pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
     clock_gettime(CLOCK_REALTIME, &cur_classifyapp_data->cur_classify_info.start_timestamp);
     
-    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV | input_url: %s (%s) | mode: %s | output_directory: %s | output_filepath: %s\n", 
+    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV HTTP POST | input_url: %s (%s) | mode: %s | output_directory: %s | output_filepath: %s\n", 
 	   cur_classifyapp_data->appconfig.input_url,
 	   cur_classifyapp_data->appconfig.input_type,
 	   (input_mode == NULL) ? "unspecified" : cur_classifyapp_data->appconfig.input_mode,
@@ -636,11 +651,12 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 	   (output_filepath == NULL) ? "unspecified" : cur_classifyapp_data->appconfig.output_filepath);
     
     cur_classifyapp_data->cur_classify_info.results_info.percentage_completed = 0;
-  
+
     //cJSON_Delete(json);		
     //fprintf(stderr,"\n\n\n\ndecoded data\n");			    
 	    
   } else {
+    syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503), %s:%d", __FILE__, __LINE__);
     *return_http_flag = HTTP_503;
   }
   
@@ -755,7 +771,8 @@ static int parse_input_request_data(uint32_t **input_request_data,
   } else if (starts_with("/api/v0/classify/", uri) == true) {
     
     int classify_id = -1, next_post_id = -1;
-
+    bool local_next_post_id_rollover_done = false;
+    
     // GET for /api/v0/classify/id/
     if (!strcmp(http_method, "GET")) {
 
@@ -764,7 +781,11 @@ static int parse_input_request_data(uint32_t **input_request_data,
       next_post_id = restful_ptr->next_post_classify_id;
       pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
 
-      if (next_post_id == 0)
+      pthread_mutex_lock(&next_post_id_rollover_done_lock);
+      local_next_post_id_rollover_done = next_post_id_rollover_done;
+      pthread_mutex_unlock(&next_post_id_rollover_done_lock);
+
+      if ( (next_post_id == 0) || (local_next_post_id_rollover_done == true) )
 	next_post_id = MAX_MESSAGES_PER_WINDOW; 
       
       syslog(LOG_INFO, "GET %s | classify_id: %d/%d | restful_ptr: %p", uri, classify_id, next_post_id, restful_ptr);
@@ -847,13 +868,13 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
   cJSON_AddStringToObject(*response_json, "input", cur_classifyapp_data->appconfig.input_url);
   cJSON_AddStringToObject(*response_json, "output_dir", cur_classifyapp_data->appconfig.output_directory);
   cJSON_AddStringToObject(*response_json, "output_filepath", cur_classifyapp_data->appconfig.output_filepath);
-  if (!strcmp(get_config()->input_mode, "video"))
+  if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "video"))
     cJSON_AddStringToObject(*response_json, "output_json_filepath", cur_classifyapp_data->appconfig.output_json_filepath);
     
   cJSON_AddItemToObject(*response_json, "config", config_json=cJSON_CreateObject());
   cJSON_AddNumberToObject(config_json, "detection_threshold", cur_classifyapp_data->appconfig.detection_threshold);
 
-  if (!strcmp(get_config()->input_mode, "video"))
+  if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "video"))
     {
       cJSON_AddNumberToObject(*response_json, "percentage_completed", cur_classifyapp_data->cur_classify_info.results_info.percentage_completed);
     }
@@ -863,7 +884,7 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
     cJSON_AddStringToObject(*response_json, "status", "finished");
     cJSON_AddNullToObject(*response_json, "error_msg");
 
-    if (!strcmp(get_config()->input_mode, "image"))
+    if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
       {
 	cJSON_AddItemToObject(*response_json, "results", results_json=cJSON_CreateObject());
 	cJSON_AddNumberToObject(results_json, "num_labels_detected", cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected);
@@ -1229,13 +1250,39 @@ static void *restful_comm_thread_func(void *context)
 
 	// Tell parent to start classify
 	if ((!strcmp(cmd, "POST")) && (http_response_status == HTTP_201)) {
+
 	  igolgi_message_struct *dispatch_msg = (igolgi_message_struct*)malloc(sizeof(igolgi_message_struct));
+	  int cur_classify_thread_status = -1, cur_dispatch_queue_size = -1, next_post_id = -1;
+	  
 	  if (dispatch_msg) {
+
 	    memset(dispatch_msg, 0, sizeof(igolgi_message_struct));
-	    dispatch_msg->buffer_flags = http_response_status;
+
+	    pthread_mutex_lock(&restful->next_post_id_lock);
+	    next_post_id = restful->next_post_classify_id;
+	    pthread_mutex_unlock(&restful->next_post_id_lock);
+	    if (next_post_id == 0)
+	      next_post_id = MAX_MESSAGES_PER_WINDOW;
+	    dispatch_msg->idx = next_post_id - 1;
 	    syslog(LOG_DEBUG, "= Sending dispatch msg: %d", http_response_status);
 	    message_queue_push_front(restful->dispatch_queue, dispatch_msg);
 	    dispatch_msg = NULL;
+
+	    // Set thread busy signal where the queue is filled up
+	    cur_dispatch_queue_size = message_queue_count(restful->dispatch_queue);
+	    pthread_mutex_lock(&restful->thread_status_lock);
+	    cur_classify_thread_status = restful->classify_thread_status;
+	    pthread_mutex_unlock(&restful->thread_status_lock);	      
+
+	    if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_IDLE) && (cur_dispatch_queue_size > (MAX_MESSAGES_PER_WINDOW-1) ) )
+	      {
+		syslog(LOG_INFO, "= cur_busy_status: idle, dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
+		syslog(LOG_INFO, "= SETTING STATUS TO BUSY, Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
+		pthread_mutex_lock(&restful->thread_status_lock);
+		restful->classify_thread_status = CLASSIFY_THREAD_STATUS_BUSY;
+		cur_classify_thread_status = restful->classify_thread_status;
+		pthread_mutex_unlock(&restful->thread_status_lock);	      
+	      }
 	  } 
 	  // syslog(LOG_INFO, "= Should push msg to msg_queue here, %s:%d", __FILE__, __LINE__);
 	  
@@ -1267,7 +1314,7 @@ restful_comm_struct *restful_comm_create(int *server_port)
   pthread_mutex_init(&restful->cur_process_id_lock, NULL);
 
   // pthread_mutex_init(&restful->classifyapp_init_lock, NULL);
-
+  syslog(LOG_INFO, "= SETTING STATUS TO IDLE at initialization, %s:%d", __FILE__, __LINE__);
   restful->classify_thread_status = CLASSIFY_THREAD_STATUS_IDLE;
 
   //syslog(LOG_DEBUG, "CRASH FLAG: %d/%p | LINE: %d, %s", 

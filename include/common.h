@@ -62,7 +62,7 @@
 
 #define MAX_DETECTIONS_PER_IMAGE 16
 #define MAX_LABEL_STRING_SIZE 128
-#define MAX_MESSAGES_PER_WINDOW 2
+#define MAX_MESSAGES_PER_WINDOW 15
 
 typedef uint64_t u64;
 typedef int64_t i64;
@@ -152,6 +152,9 @@ typedef struct _classifyapp_struct_ {
 
   
 } classifyapp_struct;
+
+bool             next_post_id_rollover_done;
+pthread_mutex_t  next_post_id_rollover_done_lock;
 
 #define __PRINTF(fmt, args...) { fprintf(stdout, fmt , ## args); fflush(stdout); }
 #define DEBUG_PRINTF(fmt, args...) __PRINTF(fmt , ## args)

@@ -128,12 +128,13 @@ static int fill_input_mode_based_on_file_type(classifyapp_struct *classifyapp_da
 	}
     }   
 
-  if (typecheck == 0)
+  /* if (typecheck == 0)
     {
       memset(mod_config()->input_mode, 0, SMALL_FIXED_STRING_SIZE);
       if (strlen(classifyapp_data->appconfig.input_mode) > 0)
 	memcpy(mod_config()->input_mode, classifyapp_data->appconfig.input_mode, strlen(classifyapp_data->appconfig.input_mode));
-    }
+	} */
+  
   return retval;
   
 }
@@ -148,11 +149,9 @@ static int check_input_url(restful_comm_struct *restful_ptr)
   pthread_mutex_lock(&restful_ptr->next_post_id_lock);
   next_post_id = restful_ptr->next_post_classify_id;
   pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
-
-  if (next_post_id >= 0)
-    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data); 
-  else
-    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
+  if (next_post_id == 0)
+    next_post_id = MAX_MESSAGES_PER_WINDOW;
+  cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
 
   if (get_config()->fastmode == false)
     {
@@ -163,7 +162,7 @@ static int check_input_url(restful_comm_struct *restful_ptr)
 	  goto exit_check_input_url;
 	}    
 
-      if (asprintf(&samplefilename, "%s/%s", cur_classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
+      if (asprintf(&samplefilename, "%s/%s", cur_classifyapp_data->appconfig.output_directory, basename(cur_classifyapp_data->appconfig.input_url)) < 0)
 	{
 	  syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
 	  retval = -1;
@@ -207,9 +206,9 @@ static int check_input_url(restful_comm_struct *restful_ptr)
       if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
 	{
       
-	  if ( !( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) ) )
+	  if ( !( (ends_with("png", cur_classifyapp_data->appconfig.input_url) == true) || (ends_with("jpg", cur_classifyapp_data->appconfig.input_url) == true) ) )
 	    {
-	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png yet, current_url: %s %s:%d", cur_classifyapp_data->appconfig.input_url, __FILE__, __LINE__);
 	      retval = -1;
 	    }
       
@@ -217,9 +216,9 @@ static int check_input_url(restful_comm_struct *restful_ptr)
       else if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "video"))
 	{
       
-	  if ( !( (ends_with("mp4", get_config()->image_url) == true) || (ends_with("ts", get_config()->image_url) == true) ) )
+	  if ( !( (ends_with("mp4", cur_classifyapp_data->appconfig.input_url) == true) || (ends_with("ts", cur_classifyapp_data->appconfig.input_url) == true) ) )
 	    {
-	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .ts or .mp4 yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .ts or .mp4 yet, current_url: %s %s:%d", cur_classifyapp_data->appconfig.input_url, __FILE__, __LINE__);
 	      retval = -1;
 	    }
 
@@ -232,13 +231,13 @@ static int check_input_url(restful_comm_struct *restful_ptr)
     {
       if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
 	{
-	  if ( (ends_with("png", get_config()->image_url) == true) || (ends_with("jpg", get_config()->image_url) == true) )
+	  if ( (ends_with("png", cur_classifyapp_data->appconfig.input_url) == true) || (ends_with("jpg", cur_classifyapp_data->appconfig.input_url) == true) )
 	    snprintf(cur_classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "image");
-	  else if ( (ends_with("mp4", get_config()->image_url) == true) || (ends_with("ts", get_config()->image_url) == true) )
+	  else if ( (ends_with("mp4", cur_classifyapp_data->appconfig.input_url) == true) || (ends_with("ts", cur_classifyapp_data->appconfig.input_url) == true) )
 	    snprintf(cur_classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "video");
 	  else
 	    {
-	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png or .mp4 or .ts yet, current_url: %s %s:%d", get_config()->image_url, __FILE__, __LINE__);
+	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png or .mp4 or .ts yet, current_url: %s %s:%d", cur_classifyapp_data->appconfig.input_url, __FILE__, __LINE__);
 	      retval = -1;
 	    }
 
@@ -258,19 +257,17 @@ static int check_output_dir(restful_comm_struct *restful_ptr)
 
   int next_post_id = -1;
   classifyapp_struct *cur_classifyapp_data = NULL;
-  
+
   pthread_mutex_lock(&restful_ptr->next_post_id_lock);
   next_post_id = restful_ptr->next_post_classify_id;
   pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
-
-  if (next_post_id >= 0)
-    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data); 
-  else
-    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
+  if (next_post_id == 0)
+    next_post_id = MAX_MESSAGES_PER_WINDOW;
+  cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
 
   // Check if directory exists 
-  if ( access(get_config()->output_directory, F_OK ) == -1 ) {
-    syslog(LOG_ERR, "= Output directory %s does not exist", get_config()->output_directory);
+  if ( access(cur_classifyapp_data->appconfig.output_directory, F_OK ) == -1 ) {
+    syslog(LOG_ERR, "= Output directory %s does not exist", cur_classifyapp_data->appconfig.output_directory);
     pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
     cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_OUTPUT_ERROR;
     pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
@@ -285,19 +282,17 @@ static int check_input_file(restful_comm_struct *restful_ptr)
 
   int next_post_id = -1;
   classifyapp_struct *cur_classifyapp_data = NULL;
-  
+
   pthread_mutex_lock(&restful_ptr->next_post_id_lock);
   next_post_id = restful_ptr->next_post_classify_id;
   pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
-
-  if (next_post_id >= 0)
-    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data); 
-  else
-    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
+  if (next_post_id == 0)
+    next_post_id = MAX_MESSAGES_PER_WINDOW;
+  cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
     
   // Check if input file exists 
-  if ( access(get_config()->image_url, F_OK ) == -1 ) {
-    syslog(LOG_ERR, "= Input file %s does not exist", get_config()->image_url);
+  if ( access(cur_classifyapp_data->appconfig.input_url, F_OK ) == -1 ) {
+    syslog(LOG_ERR, "= Input file %s does not exist", cur_classifyapp_data->appconfig.input_url);
     pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
     cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
     pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);    
@@ -307,10 +302,10 @@ static int check_input_file(restful_comm_struct *restful_ptr)
   if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
     {
       
-      if (fill_input_mode_based_on_file_type(cur_classifyapp_data, (char *)get_config()->image_url) < 0)
+      if (fill_input_mode_based_on_file_type(cur_classifyapp_data, (char *)cur_classifyapp_data->appconfig.input_url) < 0)
 	{
 
-	  syslog(LOG_ERR, "= Input's %s mode could not be determined, %s: %d", get_config()->image_url, __FILE__, __LINE__);
+	  syslog(LOG_ERR, "= Input's %s mode could not be determined, %s: %d", cur_classifyapp_data->appconfig.input_url, __FILE__, __LINE__);
 	  pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
 	  cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_INPUT_ERROR;
 	  pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);    
@@ -370,11 +365,9 @@ static int check_input_params_for_sanity(restful_comm_struct *restful_ptr)
   pthread_mutex_lock(&restful_ptr->next_post_id_lock);
   next_post_id = restful_ptr->next_post_classify_id;
   pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
-
-  if (next_post_id >= 0)
-    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data); 
-  else
-    cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
+  if (next_post_id == 0)
+    next_post_id = MAX_MESSAGES_PER_WINDOW;
+  cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
   
   if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "stream")) && (check_input_url(restful_ptr) < 0))
     {
@@ -408,7 +401,7 @@ static int check_input_params_for_sanity(restful_comm_struct *restful_ptr)
 static void *restful_classify_thread_func(void *context)
 {
   restful_comm_struct *restful = (restful_comm_struct *)context;
-  int done_handling_req = 0, i = 0, next_post_id = -1;
+  int done_handling_req = 0, i = 0, cur_proc_id = -1;
   bool continue_after_params_parsing = false;
   struct prep_network_info prep_netinfo_inst;
   classifyapp_struct *cur_classifyapp_data = NULL;
@@ -429,12 +422,13 @@ static void *restful_classify_thread_func(void *context)
   
   while(restful->is_classify_thread_active) {
     
-    pthread_mutex_lock(&restful->thread_status_lock);
-    restful->classify_thread_status = CLASSIFY_THREAD_STATUS_IDLE;
-    pthread_mutex_unlock(&restful->thread_status_lock);	      
+    //pthread_mutex_lock(&restful->thread_status_lock);
+    //restful->classify_thread_status = CLASSIFY_THREAD_STATUS_IDLE;
+    //pthread_mutex_unlock(&restful->thread_status_lock);	      
     
     done_handling_req = 0;
     continue_after_params_parsing = false;
+
     while (!done_handling_req) {
 
       // Check here? or rely on process thread to mark BUSY signal?
@@ -443,25 +437,16 @@ static void *restful_classify_thread_func(void *context)
       cur_classify_thread_status = restful->classify_thread_status;
       pthread_mutex_unlock(&restful->thread_status_lock);	      
 
-      if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_IDLE) && (cur_dispatch_queue_size > (MAX_MESSAGES_PER_WINDOW-1) ) )
-	{
-	  syslog(LOG_INFO, "= SETTING THREAD_STATUS TO BUSY, Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
-	  pthread_mutex_lock(&restful->thread_status_lock);
-	  restful->classify_thread_status = CLASSIFY_THREAD_STATUS_BUSY;
-	  cur_classify_thread_status = restful->classify_thread_status;
-	  pthread_mutex_unlock(&restful->thread_status_lock);	      
-	}
-
       if ( (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_BUSY) && (cur_dispatch_queue_size < MAX_MESSAGES_PER_WINDOW) )
 	{
-	  syslog(LOG_INFO, "= SETTING THREAD_STATUS TO IDLE, Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
+	  syslog(LOG_INFO, "= SETTING STATUS TO IDLE, Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
 	  pthread_mutex_lock(&restful->thread_status_lock);
 	  restful->classify_thread_status = CLASSIFY_THREAD_STATUS_IDLE;
 	  cur_classify_thread_status = restful->classify_thread_status;
 	  pthread_mutex_unlock(&restful->thread_status_lock);	      
 	}
 
-      // dispatch_msg = (igolgi_message_struct*)message_queue_pop_back(restful->dispatch_queue);
+      dispatch_msg = (igolgi_message_struct*)message_queue_pop_back(restful->dispatch_queue);
       
       if (!dispatch_msg) {
 	  
@@ -472,22 +457,17 @@ static void *restful_classify_thread_func(void *context)
 	  }
 	
 	usleep(10000);
+
 	continue;
 
       }
       
       //fprintf(stderr, "RECEIVED DISPATCH_MSG: %d\n", dispatch_msg->buffer_flags);	  	    
+      cur_proc_id = dispatch_msg->idx;
       free(dispatch_msg);
       dispatch_msg = NULL;
 
-      pthread_mutex_lock(&restful->next_post_id_lock);
-      next_post_id = restful->next_post_classify_id;
-      pthread_mutex_unlock(&restful->next_post_id_lock);
-
-      if (next_post_id >= 0)
-	cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data); 
-      else
-	cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + (next_post_id-1)); 
+      cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + cur_proc_id); 
 
       syslog(LOG_DEBUG, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_filepath: %s",
 	     cur_classifyapp_data->appconfig.input_url, 
@@ -554,7 +534,7 @@ static void *restful_classify_thread_func(void *context)
 			    0,
 			    &cur_classifyapp_data->cur_classify_info.results_info);
 	
-	syslog(LOG_INFO, "= Done with detect+classify, %s:%d", __FILE__, __LINE__);
+	syslog(LOG_DEBUG, "= Done with detect+classify, %s:%d", __FILE__, __LINE__);
 	
 	/* 
 	   test_detector("/home/igolgi/cnn/yolo/rkishore/darknet/restd/cfg/coco.data",
@@ -573,12 +553,15 @@ static void *restful_classify_thread_func(void *context)
 	cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
 	pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
 
-	syslog(LOG_INFO, "= Num. labels detected: %d in time: %0.2f milliseconds",
+	syslog(LOG_INFO, "= ID: %d | Num. labels detected: %d in time: %0.2f milliseconds | %s",
+	       cur_classifyapp_data->cur_classify_info.classify_id, 
 	       cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected,
-	       cur_classifyapp_data->cur_classify_info.results_info.processing_time_in_seconds * 1000.0);
+	       cur_classifyapp_data->cur_classify_info.results_info.processing_time_in_seconds * 1000.0,
+	       cur_classifyapp_data->appconfig.input_url);
 
 	for (i = 0; i<cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected; i++)
-	  syslog(LOG_INFO, "= Label #: %d | name: %s | confidence: %0.2f%% | tl: (%d,%d), tr: (%d,%d), bl: (%d,%d), br: (%d,%d)",
+	  syslog(LOG_INFO, "= ID: %d | Label #: %d | name: %s | confidence: %0.2f%% | tl: (%d,%d), tr: (%d,%d), bl: (%d,%d), br: (%d,%d)",
+		 cur_classifyapp_data->cur_classify_info.classify_id,
 		 i,
 		 cur_classifyapp_data->cur_classify_info.results_info.labels[i],
 		 cur_classifyapp_data->cur_classify_info.results_info.confidence[i],
@@ -590,6 +573,8 @@ static void *restful_classify_thread_func(void *context)
 		 cur_classifyapp_data->cur_classify_info.results_info.bottom_left_y[i],
 		 cur_classifyapp_data->cur_classify_info.results_info.bottom_right_x[i],
 		 cur_classifyapp_data->cur_classify_info.results_info.bottom_right_y[i]);
+
+	sleep(1);
 	
       }
     else
@@ -705,7 +690,8 @@ int main(int argc, char **argv)
 
   pthread_join(restful_struct->classify_thread_id, NULL);
   pthread_join(restful_struct->restful_server_thread_id, NULL);
-  message_queue_destroy(restful_struct->dispatch_queue);
+  restful_comm_destroy(restful_struct);
+  pthread_mutex_destroy(&next_post_id_rollover_done_lock);
   
   syslog(LOG_INFO, "= CLASSIFYAPP EXITING");
   

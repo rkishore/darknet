@@ -127,7 +127,7 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
   memset(classifyapp_data->appconfig.input_filename, 0, LARGE_FIXED_STRING_SIZE);
   snprintf(classifyapp_data->appconfig.input_filename, LARGE_FIXED_STRING_SIZE-1, "%s/%s",
 	   classifyapp_data->appconfig.output_directory,
-	   basename(get_config()->image_url));
+	   basename(classifyapp_data->appconfig.input_url));
 
   // Initialization
   classifyapp_data->bytes_pulled = 0;
@@ -162,8 +162,8 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
   curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_LOW_SPEED_TIME, XFER_ABORT_TIME);
 
   /* specify URL to get */ 
-  syslog(LOG_DEBUG, "= About to start pulling sample file from URL: %s", get_config()->image_url);
-  curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_URL, get_config()->image_url); 
+  syslog(LOG_DEBUG, "= About to start pulling sample file from URL: %s", classifyapp_data->appconfig.input_url);
+  curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_URL, classifyapp_data->appconfig.input_url); 
 
   /* some servers don't like requests that are made without a user-agent
      field, so we provide one */ 
@@ -185,7 +185,7 @@ int config_curl_and_pull_file(classifyapp_struct *classifyapp_data)
     
     fclose(classifyapp_data->samplefptr);
 
-    syslog(LOG_INFO, "= Done pulling from URL and writing sample file: %s in %0.2f milliseconds", get_config()->image_url, end_time * 1000.0);
+    syslog(LOG_INFO, "= Done pulling from URL and writing sample file: %s in %0.2f milliseconds", classifyapp_data->appconfig.input_url, end_time * 1000.0);
 
   } else {
     syslog(LOG_ERR, "= Could not open %s and pull data to it, line:%d, %s", classifyapp_data->appconfig.input_filename, __LINE__, __FILE__);
@@ -211,7 +211,7 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
   // char *json_str = NULL;
   char *samplefilename = NULL;
 
-  if (asprintf(&samplefilename, "%s/%s", classifyapp_data->appconfig.output_directory, basename(get_config()->image_url)) < 0)
+  if (asprintf(&samplefilename, "%s/%s", classifyapp_data->appconfig.output_directory, basename(classifyapp_data->appconfig.input_url)) < 0)
     {
       syslog(LOG_ERR, "= Could not asprintf samplefilename, %s:%d", __FILE__, __LINE__);
       return -1;
@@ -250,8 +250,8 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
   curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_LOW_SPEED_TIME, XFER_ABORT_TIME);
 
   /* specify URL to get */ 
-  syslog(LOG_INFO, "= About to start pulling sample file from URL: %s", get_config()->image_url);
-  curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_URL, get_config()->image_url); 
+  syslog(LOG_INFO, "= About to start pulling sample file from URL: %s", classifyapp_data->appconfig.input_url);
+  curl_easy_setopt(classifyapp_data->curl_data, CURLOPT_URL, classifyapp_data->appconfig.input_url); 
 
   /* some servers don't like requests that are made without a user-agent
      field, so we provide one */ 
@@ -271,7 +271,7 @@ int config_curl_and_pull_file_sample(classifyapp_struct *classifyapp_data)
 
     fclose(classifyapp_data->samplefptr);
 
-    syslog(LOG_INFO, "= Done pulling from URL and writing sample file: %s", get_config()->image_url);
+    syslog(LOG_INFO, "= Done pulling from URL and writing sample file: %s", classifyapp_data->appconfig.input_url);
 
   } else {
     syslog(LOG_ERR, "= Could not open %s and pull data to it, line:%d, %s", samplefilename, __LINE__, __FILE__);

@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 typedef struct _igolgi_message_struct {
-  void       *buffer;
+  /* void       *buffer;
   int        buffer_size;
   int        buffer_flags;
   int64_t    pull_end_timestamp_low;
@@ -28,6 +28,7 @@ typedef struct _igolgi_message_struct {
   int        intra_flag;
   int64_t    pts_diff64;
   int        opi;
+  int        idx; */
   int        idx;
 } igolgi_message_struct;
 
