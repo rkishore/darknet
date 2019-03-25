@@ -426,7 +426,7 @@ static int store_input_mode(cJSON **input_mode, classifyapp_struct *classifyapp_
       if (asprintf(&cur_err, "Unexpected input_mode: %s (valid values are 'file' or 'stream')", input_mode_data->valuestring) < 0)
 	syslog(LOG_ERR, "Out of memory? line:%d, %s", __LINE__, __FILE__);
       else {
-	syslog(LOG_ERR, "= %s", cur_err);
+	syslog(LOG_ERR, "= Unexpected input_mode: %s, %s:%d", cur_err, __FILE__, __LINE__);
 	free_mem(cur_err);
       }
       *response_http_code = HTTP_400;	
@@ -435,7 +435,7 @@ static int store_input_mode(cJSON **input_mode, classifyapp_struct *classifyapp_
     } else {
       snprintf(classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", input_mode_data->valuestring);
       //fprintf(stderr, "input_mode: %s\n", classifyapp_data->appconfig.input_mode);
-      //syslog(LOG_INFO,"= input_mode: %s\n", classifyapp_data->appconfig.input_mode);
+      syslog(LOG_INFO,"= input_mode: %s, %s:%d", classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
     }
 
   } else {
@@ -533,7 +533,7 @@ static int store_config_info(cJSON **config_info, classifyapp_struct *classifyap
   return 0;
 }
 
-static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, restful_comm_struct *restful)
+static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, restful_comm_struct *restful, char *unparsed_json_str)
 {
   // char *out = NULL;
   cJSON *input_data = NULL, *output_filepath = NULL, *output_dir = NULL;
@@ -565,6 +565,8 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 
   if (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_IDLE) {
     
+    // fprintf(stderr, "= JSON RCVD: %s\n", unparsed_json_str);
+    
     pthread_mutex_lock(&restful->next_post_id_lock);
     next_post_id = restful->next_post_classify_id;
     pthread_mutex_unlock(&restful->next_post_id_lock);
@@ -588,7 +590,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
       {
 	if ( (get_config()->dont_overwrite_old_results_until_read == true) && (cur_classifyapp_data->cur_classify_info.results_info.results_read == false) )
 	  {
-	    syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503) as older results for ID %d have not yet been read, %s:%d", next_post_id, __FILE__, __LINE__);
+	    syslog(LOG_INFO, "= Response to HTTP POST | Returning that service is unavailable (HTTP 503) as older results for ID %d/%d have not yet been read, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id, next_post_id, __FILE__, __LINE__);
 	    *return_http_flag = HTTP_503;
 	    return -1;
 	  }
@@ -666,7 +668,8 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
     clock_gettime(CLOCK_REALTIME, &cur_classifyapp_data->cur_classify_info.start_timestamp);
     
-    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV HTTP POST | input_url: %s (%s) | mode: %s | output_directory: %s | output_filepath: %s\n", 
+    syslog(LOG_INFO, "= RESTFUL_THREAD_RCV HTTP POST | ID: %d | input_url: %s (%s) | mode: %s | output_directory: %s | output_filepath: %s\n", 
+	   cur_classifyapp_data->cur_classify_info.classify_id,
 	   cur_classifyapp_data->appconfig.input_url,
 	   cur_classifyapp_data->appconfig.input_type,
 	   (input_mode == NULL) ? "unspecified" : cur_classifyapp_data->appconfig.input_mode,
@@ -765,15 +768,15 @@ static int parse_input_request_data(uint32_t **input_request_data,
 	lineptr += 4;		    
       }
 	
-      // fprintf(stderr,"lineptr: %s\n", lineptr);
-	
+      // fprintf(stderr,"= POST JSON lineptr: %s\n", lineptr);
+      
       if (lineptr) {
 	*parsed_json = cJSON_Parse(lineptr);
 	if (!*parsed_json) {
 	  fprintf(stderr,"unable to parse msg\n");
 	  *return_http_flag = HTTP_400; // Bad Request
 	} else {
-	  handle_post_request(parsed_json, return_http_flag, restful_ptr);
+	  handle_post_request(parsed_json, return_http_flag, restful_ptr, lineptr);
 	  /* if (*return_http_flag == HTTP_201)
 	    copy_to_global_config(restful_ptr); 
 	  */
@@ -811,7 +814,7 @@ static int parse_input_request_data(uint32_t **input_request_data,
       if ( (next_post_id == 0) || (local_next_post_id_rollover_done == true) )
 	next_post_id = get_config()->max_queue_length; 
       
-      syslog(LOG_INFO, "GET %s | classify_id: %d/%d | restful_ptr: %p", uri, classify_id, next_post_id, restful_ptr);
+      syslog(LOG_INFO, "= GET %s | classify_id: %d/%d | restful_ptr: %p", uri, classify_id, next_post_id, restful_ptr);
       
       if ( (classify_id >= 0) && (next_post_id >= 0) && (classify_id < next_post_id) )
 	{
@@ -1006,7 +1009,7 @@ static void get_response_for_get_single(restful_comm_struct *restful, char **ren
   // TODO: should not be doing this during the HTTP REQ-REP phase
   // Should instead get this info beforehand and report the last data read    
 
-  syslog(LOG_DEBUG, "Getting end_timestamp | %p | %d, %s", restful, __LINE__, __FILE__);
+  syslog(LOG_DEBUG, "= Getting end_timestamp | %p | %d, %s", restful, __LINE__, __FILE__);
   build_response_json_for_one_classify(restful, &resp_json);
   *rendered_json = cJSON_Print(resp_json);
   
@@ -1043,6 +1046,8 @@ static void get_response_for_post(restful_comm_struct *restful, cJSON **parsedjs
 
   *rendered_json = cJSON_Print(*parsedjson);
 
+  syslog(LOG_DEBUG, "= POST JSON response: %s, %s:%d\n", *rendered_json, __FILE__, __LINE__);
+  
   return;
 }
 
@@ -1275,7 +1280,7 @@ static void *restful_comm_thread_func(void *context)
 	  http_response_status = HTTP_400;
 	}
 		
-	// syslog(LOG_INFO, "HTTP_REQ_METHOD: %s RESPONSE: %d", cmd, http_response_status);	
+	syslog(LOG_DEBUG, "= HTTP_REQ_METHOD: %s RESPONSE: %d", cmd, http_response_status);	
 	send_response_to_client(&http_response_status, &json, &clientsock, &cmd[0], restful);
 
 	// Tell parent to start classify
@@ -1297,6 +1302,8 @@ static void *restful_comm_thread_func(void *context)
 	    syslog(LOG_DEBUG, "= Sending dispatch msg: %d", http_response_status);
 	    message_queue_push_front(restful->dispatch_queue, dispatch_msg);
 	    dispatch_msg = NULL;
+	    sem_post(restful->dispatch_queue_sem);
+	    syslog(LOG_DEBUG, "= Pushed msg to dispatch_queue and post to sem, %s:%d", __FILE__, __LINE__);
 
 	    // Set thread busy signal where the queue is filled up
 	    cur_dispatch_queue_size = message_queue_count(restful->dispatch_queue);
@@ -1338,6 +1345,9 @@ restful_comm_struct *restful_comm_create(int *server_port)
   }
 
   memset(restful, 0, sizeof(restful_comm_struct));
+
+  restful->dispatch_queue_sem = (sem_t*)malloc(sizeof(sem_t));
+  sem_init(restful->dispatch_queue_sem, 0, 0);
   
   pthread_mutex_init(&restful->thread_status_lock, NULL);
   pthread_mutex_init(&restful->next_post_id_lock, NULL);
@@ -1370,7 +1380,7 @@ restful_comm_struct *restful_comm_create(int *server_port)
   restful->cur_process_classify_id = START_CLASSIFY_ID;
   
   restful->restful_server_port = *server_port;
-
+  
   syslog(LOG_INFO, "= Done allocating basic struct needed for operations, %s:%d", __FILE__, __LINE__);
   
   return restful;
@@ -1386,6 +1396,12 @@ int restful_comm_destroy(restful_comm_struct *restful)
     pthread_mutex_destroy(&restful->next_post_id_lock);
     pthread_mutex_destroy(&restful->cur_process_id_lock);
 
+    if (restful->dispatch_queue_sem) {
+      sem_destroy(restful->dispatch_queue_sem);
+      free(restful->dispatch_queue_sem);
+      restful->dispatch_queue_sem = NULL;
+    }
+    
     for (i = 0; i<get_config()->max_queue_length; i++)
       {
 	cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + i);
@@ -1432,7 +1448,7 @@ int restful_comm_thread_start(restful_comm_struct **restful, void **dispatch_que
 {
 
   /* Create thread to listen to incoming HTTP requests to start/stop classifys or get their status */
-  *dispatch_queue = (void*)message_queue_create();	
+  *dispatch_queue = (void*)message_queue_create();
   *restful = restful_comm_create(server_port);
   restful_comm_start(*restful, *dispatch_queue);
 

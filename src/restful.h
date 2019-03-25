@@ -10,7 +10,8 @@ typedef struct _restful_comm_struct_ {
     volatile int       is_restful_thread_active;
     int                restful_server_port;
     void               *dispatch_queue;
-
+    sem_t              *dispatch_queue_sem;
+  
     pthread_mutex_t    *classifyapp_data_lock;
     classifyapp_struct *classifyapp_data;
 

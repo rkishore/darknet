@@ -74,6 +74,8 @@ void handle_signal(int signal)
     {
       restful_struct->is_classify_thread_active = 0;
       message_queue_push_front(restful_struct->dispatch_queue, NULL);
+      sem_post(restful_struct->dispatch_queue_sem);
+      syslog(LOG_INFO, "= Pushed NULL to dispatch_queue and post to sem, %s:%d", __FILE__, __LINE__);
       restful_struct->is_restful_thread_active = 0;
     }
 
@@ -112,14 +114,14 @@ static int fill_input_mode_based_on_file_type(classifyapp_struct *classifyapp_da
   if (typecheck < 0)
     retval = -1;
   else if (typecheck == 0)
-    snprintf(classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "image");
+    retval = snprintf(classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "image");
   else
     {
       typecheck = check_file_type(filename_to_check, "Media");
       if (typecheck < 0)
 	retval = -1;
       else if (typecheck == 0)
-	snprintf(classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "video");
+	retval = snprintf(classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "video");
       else
 	{
 	  syslog(LOG_ERR, "= Could not find input mode, %s:%d", __FILE__, __LINE__);
@@ -127,6 +129,8 @@ static int fill_input_mode_based_on_file_type(classifyapp_struct *classifyapp_da
 	}
     }   
 
+  syslog(LOG_DEBUG, "= snprintf retval: %d | mode: %s, %s:%d", retval, classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
+  
   /* if (typecheck == 0)
     {
       memset(mod_config()->input_mode, 0, SMALL_FIXED_STRING_SIZE);
@@ -138,19 +142,11 @@ static int fill_input_mode_based_on_file_type(classifyapp_struct *classifyapp_da
   
 }
 
-static int check_input_url(restful_comm_struct *restful_ptr) 
+static int check_input_url(classifyapp_struct *cur_classifyapp_data)
 {
 
-  int typecheck = -1, retval = 0, next_post_id = -1;
+  int typecheck = -1, retval = 0;
   char *samplefilename = NULL;
-  classifyapp_struct *cur_classifyapp_data = NULL;
-
-  pthread_mutex_lock(&restful_ptr->next_post_id_lock);
-  next_post_id = restful_ptr->next_post_classify_id;
-  pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
-  if (next_post_id == 0)
-    next_post_id = get_config()->max_queue_length;
-  cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
 
   if (get_config()->fastmode == false)
     {
@@ -231,19 +227,25 @@ static int check_input_url(restful_comm_struct *restful_ptr)
       if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
 	{
 	  if ( (ends_with("png", cur_classifyapp_data->appconfig.input_url) == true) || (ends_with("jpg", cur_classifyapp_data->appconfig.input_url) == true) )
-	    snprintf(cur_classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "image");
+	    retval = snprintf(cur_classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "image");
 	  else if ( (ends_with("mp4", cur_classifyapp_data->appconfig.input_url) == true) || (ends_with("ts", cur_classifyapp_data->appconfig.input_url) == true) )
-	    snprintf(cur_classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "video");
+	    retval = snprintf(cur_classifyapp_data->appconfig.input_mode, SMALL_FIXED_STRING_SIZE-1, "%s", "video");
 	  else
 	    {
 	      syslog(LOG_ERR, "= Cannot support URLs that don't end in .jpg or .png or .mp4 or .ts yet, current_url: %s %s:%d", cur_classifyapp_data->appconfig.input_url, __FILE__, __LINE__);
 	      retval = -1;
 	    }
 
-	  memset(mod_config()->input_mode, 0, SMALL_FIXED_STRING_SIZE);
+	  syslog(LOG_DEBUG, "= snprintf retval: %d | mode: %s, %s:%d", retval, cur_classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
+	  /* memset(mod_config()->input_mode, 0, SMALL_FIXED_STRING_SIZE);
 	  if (strlen(cur_classifyapp_data->appconfig.input_mode) > 0)
 	    memcpy(mod_config()->input_mode, cur_classifyapp_data->appconfig.input_mode, strlen(cur_classifyapp_data->appconfig.input_mode));
+	  */
 	  
+	}
+      else
+	{
+	  syslog(LOG_INFO, "= INPUT MODE LEN: %d, value = %s, %s:%d", (int)strlen(cur_classifyapp_data->appconfig.input_mode), cur_classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
 	}
     }
  exit_check_input_url:
@@ -251,19 +253,8 @@ static int check_input_url(restful_comm_struct *restful_ptr)
 
 }
 
-static int check_output_dir(restful_comm_struct *restful_ptr) 
+static int check_output_dir(classifyapp_struct *cur_classifyapp_data) 
 {
-
-  int next_post_id = -1;
-  classifyapp_struct *cur_classifyapp_data = NULL;
-
-  pthread_mutex_lock(&restful_ptr->next_post_id_lock);
-  next_post_id = restful_ptr->next_post_classify_id;
-  pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
-  if (next_post_id == 0)
-    next_post_id = get_config()->max_queue_length;
-  cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
-
   // Check if directory exists 
   if ( access(cur_classifyapp_data->appconfig.output_directory, F_OK ) == -1 ) {
     syslog(LOG_ERR, "= Output directory %s does not exist", cur_classifyapp_data->appconfig.output_directory);
@@ -276,19 +267,9 @@ static int check_output_dir(restful_comm_struct *restful_ptr)
   return 0;
 }
 
-static int check_input_file(restful_comm_struct *restful_ptr) 
+static int check_input_file(classifyapp_struct *cur_classifyapp_data) 
 {
 
-  int next_post_id = -1;
-  classifyapp_struct *cur_classifyapp_data = NULL;
-
-  pthread_mutex_lock(&restful_ptr->next_post_id_lock);
-  next_post_id = restful_ptr->next_post_classify_id;
-  pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
-  if (next_post_id == 0)
-    next_post_id = get_config()->max_queue_length;
-  cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
-    
   // Check if input file exists 
   if ( access(cur_classifyapp_data->appconfig.input_url, F_OK ) == -1 ) {
     syslog(LOG_ERR, "= Input file %s does not exist", cur_classifyapp_data->appconfig.input_url);
@@ -356,31 +337,22 @@ static int check_config(restful_comm_struct *restful_ptr)
 }
 */
 
-static int check_input_params_for_sanity(restful_comm_struct *restful_ptr) 
+static int check_input_params_for_sanity(classifyapp_struct *cur_classifyapp_data) 
 {
-  int next_post_id = -1;
-  classifyapp_struct *cur_classifyapp_data = NULL;
-  
-  pthread_mutex_lock(&restful_ptr->next_post_id_lock);
-  next_post_id = restful_ptr->next_post_classify_id;
-  pthread_mutex_unlock(&restful_ptr->next_post_id_lock);
-  if (next_post_id == 0)
-    next_post_id = get_config()->max_queue_length;
-  cur_classifyapp_data = (classifyapp_struct *)(restful_ptr->classifyapp_data + (next_post_id-1)); 
-  
-  if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "stream")) && (check_input_url(restful_ptr) < 0))
+
+  if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "stream")) && (check_input_url(cur_classifyapp_data) < 0))
     {
       syslog(LOG_ERR, "= Input URL invalid | line:%d, %s", __LINE__, __FILE__);
       return -1;
     }
 
-  if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "file")) && (check_input_file(restful_ptr) < 0))
+  if ((!strcmp(cur_classifyapp_data->appconfig.input_type, "file")) && (check_input_file(cur_classifyapp_data) < 0))
     {
       syslog(LOG_ERR, "= Input FILE invalid | line:%d, %s", __LINE__, __FILE__);
       return -1;
     }
 
-  if (check_output_dir(restful_ptr) < 0)
+  if (check_output_dir(cur_classifyapp_data) < 0)
     {
       syslog(LOG_ERR, "= Output directory does not exist | line:%d, %s", __LINE__, __FILE__);
       return -1;
@@ -445,6 +417,8 @@ static void *restful_classify_thread_func(void *context)
 	  pthread_mutex_unlock(&restful->thread_status_lock);	      
 	}
 
+      sem_wait(restful->dispatch_queue_sem);
+      
       dispatch_msg = (igolgi_message_struct*)message_queue_pop_back(restful->dispatch_queue);
       
       if (!dispatch_msg) {
@@ -468,13 +442,15 @@ static void *restful_classify_thread_func(void *context)
 
       cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + cur_proc_id); 
 
-      syslog(LOG_DEBUG, "= RCVD DISPATCH_MSG | input_url: %s | output_directory: %s | output_filepath: %s",
+      syslog(LOG_INFO, "= RCVD DISPATCH_MSG | id: %d (%d) | input_url: %s | output_directory: %s | output_filepath: %s",
+	     cur_proc_id,
+	     cur_classifyapp_data->cur_classify_info.classify_id,
 	     cur_classifyapp_data->appconfig.input_url, 
 	     cur_classifyapp_data->appconfig.output_directory,
 	     cur_classifyapp_data->appconfig.output_filepath);
 
       // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
-      if (check_input_params_for_sanity(restful) == 0)
+      if (check_input_params_for_sanity(cur_classifyapp_data) == 0)
 	{
 	  // syslog(LOG_INFO, "HERE %d, %s", __LINE__, __FILE__);
 	  // copy_to_recovery_configfile(restful);
@@ -574,10 +550,10 @@ static void *restful_classify_thread_func(void *context)
 		 cur_classifyapp_data->cur_classify_info.results_info.bottom_right_x[i],
 		 cur_classifyapp_data->cur_classify_info.results_info.bottom_right_y[i]);
 
-	sleep(1);
+	// sleep(1);
 	
       }
-    else
+    else if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "video"))
       {
 
 	syslog(LOG_INFO, "= Detect+classify for %s: %s, %s:%d",
@@ -599,6 +575,17 @@ static void *restful_classify_thread_func(void *context)
 	cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
 	pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
 	
+      }
+    else
+      {
+
+	syslog(LOG_ERR, "= mode == %s not supported, %s:%d", cur_classifyapp_data->appconfig.input_mode, __FILE__, __LINE__);
+	syslog(LOG_DEBUG, "= Setting end_timestamp | restful_ptr: %p | %s:%d", restful, __FILE__, __LINE__);
+	clock_gettime(CLOCK_REALTIME, &cur_classifyapp_data->cur_classify_info.end_timestamp);
+	pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	cur_classifyapp_data->cur_classify_info.classify_status = CLASSIFY_STATUS_COMPLETED;
+	pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+		
       }
   }
 
