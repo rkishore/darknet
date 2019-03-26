@@ -72,6 +72,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
       {"daemon-port", required_argument, 0, 'f'},
       {"data-folder-path", required_argument, 0, 'g'},
       {"gpu-idx", required_argument, 0, 'i'},
+      {"results-read-thresh-ms", required_argument, 0, 'j'},
       {"log-level", required_argument, 0, 'L'},
       {"tmp-output-path", required_argument, 0, 'm'},
       {"fastmode", no_argument, 0, 'n'},
@@ -83,7 +84,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
     };
 
     int option_index = 0;
-    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:L:m:o:p:nhv", 
+    int c = getopt_long(*argc, argv, "a:b:c:d:e:f:g:i:j:L:m:o:p:nhv", 
 			long_options,
                         &option_index);
     int sizeof_char_ptr = sizeof(char *);
@@ -122,6 +123,9 @@ get_info_from_cmdline_args(int *argc, char **argv)
       break;
     case 'i':
       mod_config()->gpu_idx = atoi(optarg);
+      break;
+    case 'j':
+      mod_config()->results_read_thresh_ms = atof(optarg);
       break;
     case 'L' : 
       //      mod_config()->debug_level = optarg;
@@ -165,11 +169,12 @@ get_info_from_cmdline_args(int *argc, char **argv)
 	  get_config()->interface_name,
 	  get_config()->data_folder_path);
 
-  fprintf(stderr, "= CMDLINE args 2 | max-queue-length: %d (default: %d) | dont_overwrite_results_flag: %d | fastmode: %d\n",
+  fprintf(stderr, "= CMDLINE args 2 | max-queue-length: %d (default: %d) | dont_overwrite_results_flag: %d | fastmode: %d | results_read_thresh_ms: %0.2f\n",
 	  get_config()->max_queue_length,
 	  (int)MAX_MESSAGES_PER_WINDOW,
 	  (int)get_config()->dont_overwrite_old_results_until_read,
-	  (int)get_config()->fastmode);
+	  (int)get_config()->fastmode,
+	  get_config()->results_read_thresh_ms);
   
   if ( (get_config()->max_queue_length > MAX_ALLOWED_MESSAGES_PER_WINDOW) || (get_config()->max_queue_length < 1) )
     {

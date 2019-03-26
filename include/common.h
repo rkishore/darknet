@@ -92,6 +92,7 @@ struct detection_results {
   float confidence[MAX_DETECTIONS_PER_IMAGE];
 
   float processing_time_in_seconds;
+  double processing_time_end;
   volatile float percentage_completed;
 
   int top_left_x[MAX_DETECTIONS_PER_IMAGE];

@@ -1581,6 +1581,7 @@ void run_detector_custom(struct prep_network_info *prep_netinfo,
   }
 
   results_info->processing_time_in_seconds = what_time_is_it_now()-time;
+  results_info->processing_time_end = what_time_is_it_now();
   //printf("= %s: Predicted in %f seconds.\n", input, results_info->processing_time_in_seconds);
 
   return;

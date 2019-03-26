@@ -18,6 +18,7 @@
 #include "fastpool.h"
 #include "common.h"
 #include "config.h"
+#include "utils.h"
 
 #define RESTFUL_MAX_MESSAGE_SIZE      1024
 #define MAX_LISTEN 10
@@ -590,9 +591,31 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
       {
 	if ( (get_config()->dont_overwrite_old_results_until_read == true) && (cur_classifyapp_data->cur_classify_info.results_info.results_read == false) )
 	  {
-	    syslog(LOG_INFO, "= Response to HTTP POST | Returning that service is unavailable (HTTP 503) as older results for ID %d/%d have not yet been read, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id, next_post_id, __FILE__, __LINE__);
-	    *return_http_flag = HTTP_503;
-	    return -1;
+	    
+	    double time_now = what_time_is_it_now(), processing_time_ms = cur_classifyapp_data->cur_classify_info.results_info.processing_time_in_seconds * 1000.0;
+	    double time_passed_ms = (time_now - cur_classifyapp_data->cur_classify_info.results_info.processing_time_end) * 1000.0;
+	    bool reset_results_read_flag = ( (cur_classifyapp_data->cur_classify_info.results_info.processing_time_end > 0) &&
+					     ( (processing_time_ms >= get_config()->results_read_thresh_ms) || (time_passed_ms >= get_config()->results_read_thresh_ms) ) ) ;
+
+	    syslog(LOG_INFO, "= id: %d | results_read? %d processing_time_ms: %0.2f time_passed_ms: %0.2f reset_results_read? %d, %s:%d",
+		   next_post_id,
+		   (int)cur_classifyapp_data->cur_classify_info.results_info.results_read,
+		   processing_time_ms,
+		   time_passed_ms,
+		   (int)reset_results_read_flag,
+		   __FILE__, __LINE__);
+	    
+	    if (reset_results_read_flag == false)
+	      {
+		syslog(LOG_INFO, "= Response to HTTP POST | Returning that service is unavailable (HTTP 503) as older results for ID %d/%d have not yet been read, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id, next_post_id, __FILE__, __LINE__);
+		
+		*return_http_flag = HTTP_503;
+
+		return -1;
+	      }
+	    else
+	      cur_classifyapp_data->cur_classify_info.results_info.results_read = true;
+	    
 	  }
       }
 
@@ -603,6 +626,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     cur_classifyapp_data->cur_classify_info.classify_status = -1;
     pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
     cur_classifyapp_data->bytes_pulled = 0;
+    cur_classifyapp_data->cur_classify_info.results_info.processing_time_end = -1.0;
 	
     //fprintf(stderr,"decoding data:%s\n", lineptr);
     input_data = cJSON_GetObjectItem(*parsedjson, "input");
