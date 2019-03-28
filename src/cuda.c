@@ -87,7 +87,7 @@ cudaStream_t get_cuda_stream() {
         if (status != cudaSuccess) {
             printf(" cudaStreamCreate error: %d \n", status);
             const char *s = cudaGetErrorString(status);
-            char buffer[256];
+            // char buffer[256];
             printf("CUDA Error: %s\n", s);
             status = cudaStreamCreateWithFlags(&streamsArray[i], cudaStreamDefault);
             CHECK_CUDA(status);
@@ -108,7 +108,7 @@ cudaStream_t get_cuda_memcpy_stream() {
         if (status != cudaSuccess) {
             printf(" cudaStreamCreate-Memcpy error: %d \n", status);
             const char *s = cudaGetErrorString(status);
-            char buffer[256];
+            //char buffer[256];
             printf("CUDA Error: %s\n", s);
             status = cudaStreamCreateWithFlags(&streamsArray2[i], cudaStreamDefault);
             CHECK_CUDA(status);
@@ -198,6 +198,8 @@ float *cuda_make_array(float *x, size_t n)
 {
     float *x_gpu;
     size_t size = sizeof(float)*n;
+    fprintf(stderr, "= Setting GPU idx to %d, %s:%d\n", gpu_index, __FILE__, __LINE__);
+    cuda_set_device(gpu_index);
     cudaError_t status = cudaMalloc((void **)&x_gpu, size);
     if (status != cudaSuccess) fprintf(stderr, " Try to set subdivisions=64 in your cfg-file. \n");
     CHECK_CUDA(status);
@@ -241,6 +243,8 @@ int *cuda_make_int_array(size_t n)
 {
     int *x_gpu;
     size_t size = sizeof(int)*n;
+    fprintf(stderr, "= Setting GPU idx to %d, %s:%d\n", gpu_index, __FILE__, __LINE__);
+    cuda_set_device(gpu_index);
     cudaError_t status = cudaMalloc((void **)&x_gpu, size);
     if(status != cudaSuccess) fprintf(stderr, " Try to set subdivisions=64 in your cfg-file. \n");
     CHECK_CUDA(status);
