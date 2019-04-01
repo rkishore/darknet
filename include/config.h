@@ -45,7 +45,9 @@ struct Config* mod_config();
 int create_config();
 void free_config();
 void fill_default_config();
+#ifdef CLASSIFYAPP
 int fill_unique_node_signature(const char *iname);
+#endif
 
 void print_usage(const char *app_name);
 void free_mem(void *ptr_to_free);

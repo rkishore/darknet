@@ -42,10 +42,11 @@ void draw_train_loss(IplImage* img, int img_size, float avg_loss, float max_img_
 int cvRound(double value) {return(ceil(value));}
 #endif
 
+#include "config.h"
+
 #ifdef CLASSIFYAPP
 #include "classifyapp.h"
 #include "restful.h"
-#include "config.h"
 #include "fork_exec.h"
 #endif
 
@@ -1796,6 +1797,8 @@ void run_detector(int argc, char **argv)
     // and for recall mode (extended output table-like format with results for best_class fit)
     int ext_output = find_arg(argc, argv, "-ext_output");
     int save_labels = find_arg(argc, argv, "-save_labels");
+    char *data_folder_path = find_char_arg(argc, argv, "-data_folder", 0);
+    
     if (argc < 4) {
         fprintf(stderr, "usage: %s %s [train/test/valid/demo/map] [data] [cfg] [weights (optional)]\n", argv[0], argv[1]);
         return;
@@ -1833,6 +1836,18 @@ void run_detector(int argc, char **argv)
         if (strlen(weights) > 0)
             if (weights[strlen(weights) - 1] == 0x0d) weights[strlen(weights) - 1] = 0;
     char *filename = (argc > 6) ? argv[6] : 0;
+
+    int retval = create_config();
+    if (retval < 0) {
+      fprintf(stdout, "= ERROR: Could not allocate memory for config\n");
+      exit(-1);
+    }
+
+    fill_default_config();
+
+    memset(mod_config()->data_folder_path, 0, LARGE_FIXED_STRING_SIZE);
+    memcpy(mod_config()->data_folder_path, data_folder_path, strlen(data_folder_path));
+
     if (0 == strcmp(argv[2], "test")) test_detector(datacfg, cfg, weights, filename, thresh, hier_thresh, dont_show, ext_output, save_labels, outfile);
     else if (0 == strcmp(argv[2], "train")) train_detector(datacfg, cfg, weights, gpus, ngpus, clear, dont_show, calc_map, mjpeg_port);
     else if (0 == strcmp(argv[2], "valid")) validate_detector(datacfg, cfg, weights, outfile);

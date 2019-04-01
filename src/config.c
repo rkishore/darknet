@@ -67,6 +67,7 @@ void print_usage(const char *app_name)
 
 }
 
+#ifdef CLASSIFYAPP
 int get_unique_node_signature(char *unique_signature, const char *iname)
 {
   int retval;
@@ -114,6 +115,7 @@ int fill_unique_node_signature(const char *iname)
   
   return 0;
 }
+#endif
 
 void fill_default_config()
 {
