@@ -79,7 +79,8 @@ if __name__ == "__main__":
         sys.exit(0)
     
     # json_filenames_to_notprocess = []
-    
+   
+    logging.info(" Number of categories: %d" % (total_categories,)) 
     logging.info(" Number of files in validation set: %d | test set: %d" % (len(validation_filenames), len(test_filenames)))
     
     '''
@@ -146,16 +147,24 @@ if __name__ == "__main__":
                     if (args["outputfilepath"].endswith("/")):
                         # final_txtfile_path = args["outputfilepath"] + input_txtfile_name_only
                         final_txtfile_path = args["outputfilepath"] + "%07d.txt" % (global_img_idx,)
+                        ffmpeg_log_filepath = args["outputfilepath"] + "%07d.log" % (global_img_idx,)
                     else:
                         # final_txtfile_path = args["outputfilepath"] + "/" + input_txtfile_name_only
                         final_txtfile_path = args["outputfilepath"] + "/" + "%07d.txt" % (global_img_idx,)
-                            
+                        ffmpeg_log_filepath = args["outputfilepath"] + "/" + "%07d.log" % (global_img_idx,)
+                                                
                     logging.debug(" Input_txt_filepath: %s, final_txt_filepath: %s" % (input_txtfile_path, final_txtfile_path,))
 
                     # Copy image file to final destination
                     logging.info(" Copying %s to %s" % (input_imgfile_path, final_imgfile_path,))
                     shutil.copyfile(input_imgfile_path, final_imgfile_path)
 
+                    with open(ffmpeg_log_filepath, "w") as ofp_log:
+                        ffmpeg_info_cmd = "/usr/bin/ffmpeg -hide_banner -i \"%s\"" % (final_imgfile_path,)
+                        ofp_log.write("%s\n" % (ffmpeg_info_cmd))
+                        ofp_log.flush()
+                        subprocess.call(ffmpeg_info_cmd, stdout=ofp_log, stderr=ofp_log, shell=True)
+                    
                     num_objects_in_training_img = len(ifp_data["per_frame_info"][img_name]["regions"])
                     if num_objects_in_training_img > 0:
 
@@ -215,7 +224,7 @@ if __name__ == "__main__":
                                 else:
                                     num_train_objects += 1
                                     num_train_cat_objects[img_category_label] += 1
-                                                
+                                                    
                         if json_filename_only in test_filenames:
                             logging.info(" Writing ftest imgpath %s of category %d from %s" % (final_imgfile_path, img_category_label, json_filename_only,))
                             ofp_ftest.write("%s\n" % (final_imgfile_path,))
@@ -232,7 +241,6 @@ if __name__ == "__main__":
                             ofp_train.write("%s\n" % (final_imgfile_path,))
                             ofp_train.flush()
                             num_train_imgs += 1
-                        
                     else:
 
                         logging.info(" Creating empty txt file %s" % (input_txtfile_path,))
