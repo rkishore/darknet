@@ -56,7 +56,13 @@ if __name__ == "__main__":
     logging.info(" Number of files to process: %d" % (len(inputfiles_to_process)))
     
     # Validation set
-    validation_filenames = ["4-2end to 93623.json"]
+    validation_filenames = ["10-2 to frame 9749.json",
+                            "17-1_3Bongo_10Cargo_3Flatbed_6Dump_Tanker_2Bus.json",
+                            "8dump_1pickup_1bongo_2water_1semi-container_2stakebeds_1lowboy--I hope.json",
+                            "17-2_2Bongo_2Truck_Dump_2Tanker_Bus.json",
+                            "4-2end to 93623.json",
+                            "25-1_2Bus_3Truck_Bongo.json",
+                            "CPBackwards98391.json"]
     
     # Test set (we have detection results without training for these videos)
     # json_filenames_to_notprocess = []
@@ -221,10 +227,10 @@ if __name__ == "__main__":
                                 elif json_filename_only in validation_filenames:
                                     num_valid_objects += 1
                                     num_valid_cat_objects[img_category_label] += 1
-                                else:
-                                    num_train_objects += 1
-                                    num_train_cat_objects[img_category_label] += 1
-                                                    
+                                #else:
+                                num_train_objects += 1
+                                num_train_cat_objects[img_category_label] += 1
+                                                
                         if json_filename_only in test_filenames:
                             logging.info(" Writing ftest imgpath %s of category %d from %s" % (final_imgfile_path, img_category_label, json_filename_only,))
                             ofp_ftest.write("%s\n" % (final_imgfile_path,))
@@ -236,11 +242,12 @@ if __name__ == "__main__":
                             ofp_valid.write("%s\n" % (final_imgfile_path,))
                             ofp_valid.flush()
                             num_valid_imgs += 1
-                        else:
-                            logging.info(" Writing training imgpath %s of category %d from %s" % (final_imgfile_path, img_category_label, json_filename_only,))
-                            ofp_train.write("%s\n" % (final_imgfile_path,))
-                            ofp_train.flush()
-                            num_train_imgs += 1
+                        #else:
+                        logging.info(" Writing training imgpath %s of category %d from %s" % (final_imgfile_path, img_category_label, json_filename_only,))
+                        ofp_train.write("%s\n" % (final_imgfile_path,))
+                        ofp_train.flush()
+                        num_train_imgs += 1
+                        
                     else:
 
                         logging.info(" Creating empty txt file %s" % (input_txtfile_path,))
