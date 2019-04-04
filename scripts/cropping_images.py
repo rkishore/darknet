@@ -30,6 +30,22 @@ categories = ["Cargo/Box Truck",
               "Standard SUV",
               "Other"]
 
+categories_for_img = ["cargo-truck",
+                      "dump-truck",
+                      "bongo-truck",
+                      "water-tanker-truck",
+                      "standard-bus",
+                      "standard-compactor",
+                      "stakebed-truck",
+                      "flatbed-truck",
+                      "container-semi-truck",
+                      "container-tanker-truck",
+                      "lowboy-semi-truck",
+                      "pick-up-truck",
+                      "mini-van",
+                      "standard-suv",
+                      "other"]
+
 total_categories = len(categories)
 
 def crop(image_path, coords, saved_location):
@@ -138,8 +154,8 @@ if __name__ == '__main__':
                 if (os.path.exists("%s" % (input_imgfile_path,))):
 
                     # Copy image file to final destination
-                    logging.info(" Copying %s to %s" % (input_imgfile_path, final_imgfile_path,))
-                    shutil.copyfile(input_imgfile_path, final_imgfile_path)
+                    # logging.info(" Copying %s to %s" % (input_imgfile_path, final_imgfile_path,))
+                    # shutil.copyfile(input_imgfile_path, final_imgfile_path)
 
                     num_objects_in_training_img = len(ifp_data["per_frame_info"][img_name]["regions"])
                     if num_objects_in_training_img > 0:
@@ -158,10 +174,25 @@ if __name__ == '__main__':
                             x_bottomright = x_topleft + img_width
                             y_bottomright = y_topleft + img_height
 
-                            if img_dir_path.endswith("/"):
-                                final_imgfile_path = args["outputfilepath"] + "%07d-%d.png" % (global_img_idx, local_obj_idx)
+                            cur_category = objinfo["subcategory"].strip() + " " + objinfo["category"].strip()
+                            if cur_category.startswith("Cargo/Box"):
+                                cur_category = "Cargo/Box Truck"
+                            if "Trucks" in cur_category:
+                                cur_category = cur_category.replace("Trucks", "Truck")
+                            if "Van" in cur_category:
+                                cur_category = cur_category.rsplit(" Van", 1)[0]
+                                    
+                            if cur_category in categories:
+                                img_category_label = categories.index(cur_category)
                             else:
-                                final_imgfile_path = args["outputfilepath"] + "/" + "%07d-%d.png" % (global_img_idx, local_obj_idx)
+                                print "= Category other than expected: %s" % (cur_category,)
+                                cur_category = "Other"
+                                img_category_label = categories.index(cur_category)
+
+                            if img_dir_path.endswith("/"):
+                                final_imgfile_path = args["outputfilepath"] + "%s-%07d-%d.jpg" % (categories_for_img[img_category_label], global_img_idx, local_obj_idx)
+                            else:
+                                final_imgfile_path = args["outputfilepath"] + "/" + "%s-%07d-%d.jpg" % (categories_for_img[img_category_label], global_img_idx, local_obj_idx)
                                 
                             logging.info(" Generating cropped img from %s to %s | coordinates: (%0.1f, %0.1f, %0.1f, %0.1f)" % (input_imgfile_path, final_imgfile_path, \
                                                                                                                                 x_topleft, y_topleft, x_bottomright, y_bottomright))
