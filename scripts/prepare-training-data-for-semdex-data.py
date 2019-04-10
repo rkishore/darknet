@@ -31,6 +31,8 @@ categories = ["Cargo/Box Truck",
               "Pick Up Truck",
               "Mini Van",
               "Standard SUV",
+              "Cargo Semi Truck",
+              "2 wheel Motorcycle",
               "Other"]
 
 total_categories = len(categories)
@@ -56,8 +58,13 @@ if __name__ == "__main__":
     logging.info(" Number of files to process: %d" % (len(inputfiles_to_process)))
     
     # Validation set
-    validation_filenames = ["10-2 to frame 9749.json",
+    validation_filenames = ["10-2 from frame 3557 to 3732.json",
+                            "10-2 to frame 9749.json",
+                            "10-2 from front to frame 3552.json",
+                            "10-2 dump .json",
+                            "10-2 frame 3732 to frame 7098.json",
                             "17-1_3Bongo_10Cargo_3Flatbed_6Dump_Tanker_2Bus.json",
+                            "4-2CPBackwards101999.json",
                             "8dump_1pickup_1bongo_2water_1semi-container_2stakebeds_1lowboy--I hope.json",
                             "17-2_2Bongo_2Truck_Dump_2Tanker_Bus.json",
                             "4-2end to 93623.json",

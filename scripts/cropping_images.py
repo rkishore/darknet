@@ -28,6 +28,8 @@ categories = ["Cargo/Box Truck",
               "Pick Up Truck",
               "Mini Van",
               "Standard SUV",
+              "Cargo Semi Truck",
+              "2 wheel Motorcycle",
               "Other"]
 
 categories_for_img = ["cargo-truck",
@@ -44,6 +46,8 @@ categories_for_img = ["cargo-truck",
                       "pick-up-truck",
                       "mini-van",
                       "standard-suv",
+                      "cargo-semi-truck",
+                      "motorcyle",
                       "other"]
 
 total_categories = len(categories)

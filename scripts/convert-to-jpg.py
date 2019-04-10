@@ -106,22 +106,23 @@ if __name__ == '__main__':
                 if (os.path.exists("%s" % (input_imgfile_path,))):
 
                     # Copy image file to final destination
-                    logging.info(" Moving %s to %s (logfile: %s)" % (input_imgfile_path, input_png_imgfile_path, convert_log_filepath,))
-                    shutil.move(input_imgfile_path, input_png_imgfile_path)
+                    if (not os.path.exists("%s" % (input_png_imgfile_path,))):
+                        logging.info(" Moving %s to %s (logfile: %s)" % (input_imgfile_path, input_png_imgfile_path, convert_log_filepath,))
+                        shutil.move(input_imgfile_path, input_png_imgfile_path)
                     
-                    with open(convert_log_filepath, "w") as ofp_log:
-                        logging.info(" Converting %s to %s" % (input_png_imgfile_path, input_imgfile_path,))
-                        convert_cmd_to_exec = "/usr/bin/convert %s %s" % (input_png_imgfile_path, input_imgfile_path,)
-                        ofp_log.write("%s\n" % (convert_cmd_to_exec))
-                        ofp_log.flush()
-                        subprocess.call(convert_cmd_to_exec, stdout=ofp_log, stderr=ofp_log, shell=True)
-                        ofp_log.flush()
-                        ffmpeg_info_cmd = "/usr/bin/ffmpeg -hide_banner -i \"%s\"" % (input_imgfile_path,)
-                        ofp_log.write("%s\n" % (ffmpeg_info_cmd))
-                        ofp_log.flush()
-                        subprocess.call(ffmpeg_info_cmd, stdout=ofp_log, stderr=ofp_log, shell=True)
+                        with open(convert_log_filepath, "w") as ofp_log:
+                            logging.info(" Converting %s to %s" % (input_png_imgfile_path, input_imgfile_path,))
+                            convert_cmd_to_exec = "/usr/bin/convert %s %s" % (input_png_imgfile_path, input_imgfile_path,)
+                            ofp_log.write("%s\n" % (convert_cmd_to_exec))
+                            ofp_log.flush()
+                            subprocess.call(convert_cmd_to_exec, stdout=ofp_log, stderr=ofp_log, shell=True)
+                            ofp_log.flush()
+                            ffmpeg_info_cmd = "/usr/bin/ffmpeg -hide_banner -i \"%s\"" % (input_imgfile_path,)
+                            ofp_log.write("%s\n" % (ffmpeg_info_cmd))
+                            ofp_log.flush()
+                            subprocess.call(ffmpeg_info_cmd, stdout=ofp_log, stderr=ofp_log, shell=True)
 
-                    # shutil.copyfile(input_imgfile_path, final_imgfile_path)
+                        # shutil.copyfile(input_imgfile_path, final_imgfile_path)
                     
                             
                 else:
