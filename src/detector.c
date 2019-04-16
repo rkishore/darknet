@@ -266,7 +266,11 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
         i = get_current_batch(net);
 
         int calc_map_for_each = iter_map + 4 * train_images_num / (net.batch * net.subdivisions);  // calculate mAP for each 4 Epochs
+	if (calc_map)
+	  printf("\n calc_map_for_each before 1: %f | burn_in: %f", calc_map_for_each, net.burn_in);
         calc_map_for_each = fmax(calc_map_for_each, net.burn_in);
+	if (calc_map)
+	  printf("\n calc_map_for_each before 2: %f", calc_map_for_each);
         calc_map_for_each = fmax(calc_map_for_each, 1000);
         if (calc_map) {
             printf("\n (next mAP calculation at %d iterations) ", calc_map_for_each);
@@ -1465,6 +1469,16 @@ void get_detections_custom(image im, detection *dets, int num, float thresh, cha
   
   detection_with_class* selected_detections = get_actual_detections(dets, num, thresh, &results_info->num_labels_detected, names);
 
+  if (results_info->num_labels_detected > MAX_DETECTIONS_PER_IMAGE)
+    {
+      syslog(LOG_ERR, "= num_labels_detected (%d) cannot be greater than %d to avoid buffer overflows. Setting it to %d, %s:%d",
+	     results_info->num_labels_detected,
+	     (int)MAX_DETECTIONS_PER_IMAGE,
+	     (int)MAX_DETECTIONS_PER_IMAGE,
+	     __FILE__, __LINE__);
+      results_info->num_labels_detected = MAX_DETECTIONS_PER_IMAGE;
+    }
+  
   qsort(selected_detections, results_info->num_labels_detected, sizeof(*selected_detections), compare_by_lefts);
   for (i = 0; i < results_info->num_labels_detected; ++i) {
     

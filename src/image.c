@@ -25,6 +25,11 @@
 
 #include "config.h"
 
+#ifdef CLASSIFYAPP
+#include <syslog.h>
+#include "common.h"
+#endif
+
 #define CV_RGB(r, g, b) cvScalar( (b), (g), (r), 0 )
 #endif
 
@@ -292,6 +297,18 @@ detection_with_class* get_actual_detections(detection *dets, int dets_num, float
             result_arr[selected_num].det = dets[i];
             result_arr[selected_num].best_class = best_class;
             ++selected_num;
+	    
+#ifdef CLASSIFYAPP
+	    if (selected_num == MAX_DETECTIONS_PER_IMAGE)
+	      {
+		syslog(LOG_INFO, "= Breaking out of loop to fill in detections info as actual number (%d) may be greater than what this build can support (%d), %s:%d",
+		       dets_num,
+		       (int)MAX_DETECTIONS_PER_IMAGE,
+		       __FILE__, __LINE__);
+		break;
+	      }
+#endif
+	    
         }
     }
     if (selected_detections_num)
