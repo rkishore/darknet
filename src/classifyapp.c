@@ -390,7 +390,12 @@ static void *restful_classify_thread_func(void *context)
 			  (char *)get_config()->dnn_data_file,
 			  (char *)get_config()->dnn_config_file,
 			  (char *)get_config()->dnn_weights_file);
-  
+
+  syslog(LOG_INFO, "= SETTING STATUS TO IDLE after network setup, %s:%d", __FILE__, __LINE__);  
+  pthread_mutex_lock(&restful->thread_status_lock);
+  restful->classify_thread_status = CLASSIFY_THREAD_STATUS_IDLE;
+  pthread_mutex_unlock(&restful->thread_status_lock);
+
   while(restful->is_classify_thread_active) {
     
     //pthread_mutex_lock(&restful->thread_status_lock);

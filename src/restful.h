@@ -31,7 +31,6 @@ typedef struct _restful_comm_struct_ {
 
     int                next_post_classify_id, get_request_classify_id, cur_process_classify_id;
     pthread_mutex_t    next_post_id_lock, cur_process_id_lock;
-    
   
 } restful_comm_struct;
 
@@ -47,6 +46,7 @@ enum {
 };
 
 enum {
+  CLASSIFY_THREAD_STATUS_NOTSETUP,
   CLASSIFY_THREAD_STATUS_IDLE,
   CLASSIFY_THREAD_STATUS_BUSY
 };

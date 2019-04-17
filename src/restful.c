@@ -706,7 +706,10 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
     //fprintf(stderr,"\n\n\n\ndecoded data\n");			    
 	    
   } else {
-    syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503) as input queue is full, %s:%d", __FILE__, __LINE__);
+    if (cur_classify_thread_status == CLASSIFY_THREAD_STATUS_NOTSETUP)
+      syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503) as network setup is not yet completed, %s:%d", __FILE__, __LINE__);
+    else
+      syslog(LOG_INFO, "= Returning that service is unavailable (HTTP 503) as input queue is full, %s:%d", __FILE__, __LINE__);
     *return_http_flag = HTTP_503;
   }
   
@@ -942,29 +945,41 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
     
     if (!strcmp(cur_classifyapp_data->appconfig.input_mode, "image"))
       {
+	syslog(LOG_DEBUG, "= Creating results_json for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	cJSON_AddItemToObject(*response_json, "results", results_json=cJSON_CreateObject());
+	syslog(LOG_DEBUG, "= Adding results_json->num_labels_detected for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	cJSON_AddNumberToObject(results_json, "num_labels_detected", cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected);
-	  
+
+	syslog(LOG_DEBUG, "= Creating labels_array_json for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	labels_array_json = cJSON_CreateArray();
 	for ( i=0; i<cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected; i++)
 	  {
+	    syslog(LOG_DEBUG, "= Adding labels %d for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id, i, __FILE__, __LINE__);
 	    cJSON_AddItemToArray(labels_array_json, cJSON_CreateString((const char *)cur_classifyapp_data->cur_classify_info.results_info.labels[i]));
 	  }
+	syslog(LOG_DEBUG, "= Adding labels for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	cJSON_AddItemToObject(results_json, "labels", labels_array_json);
-	  
+
+	syslog(LOG_DEBUG, "= Creating confidence_array_json for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	confidence_array_json = cJSON_CreateFloatArray((const float *)cur_classifyapp_data->cur_classify_info.results_info.confidence, cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected);
+	syslog(LOG_DEBUG, "= Adding confidence for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	cJSON_AddItemToObject(results_json, "confidence", confidence_array_json);
+	syslog(LOG_DEBUG, "= Adding processing_time_in_ms for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	cJSON_AddNumberToObject(results_json, "processing_time_in_ms", cur_classifyapp_data->cur_classify_info.results_info.processing_time_in_seconds*1000.0);
-	  
+
+	syslog(LOG_DEBUG, "= Creating left_array_json for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	left_array_json = cJSON_CreateIntArray((const int *)cur_classifyapp_data->cur_classify_info.results_info.left, cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected);
 	cJSON_AddItemToObject(results_json, "left", left_array_json);
-	  
+
+	syslog(LOG_DEBUG, "= Creating right_array_json for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	right_array_json = cJSON_CreateIntArray((const int *)cur_classifyapp_data->cur_classify_info.results_info.right, cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected);
 	cJSON_AddItemToObject(results_json, "right", right_array_json);
-	  
+
+	syslog(LOG_DEBUG, "= Creating top_array_json for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	top_array_json = cJSON_CreateIntArray((const int *)cur_classifyapp_data->cur_classify_info.results_info.top, cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected);
 	cJSON_AddItemToObject(results_json, "top", top_array_json);
-	  
+
+	syslog(LOG_DEBUG, "= Creating bottom_array_json for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
 	bottom_array_json = cJSON_CreateIntArray((const int *)cur_classifyapp_data->cur_classify_info.results_info.bottom, cur_classifyapp_data->cur_classify_info.results_info.num_labels_detected);
 	cJSON_AddItemToObject(results_json, "bottom", bottom_array_json);
 	
@@ -1004,7 +1019,9 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
     } 
     
   }
-    
+
+  syslog(LOG_DEBUG, "= Adding time_started for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
+  
   // Report time this job started
   ptm = localtime(&cur_classifyapp_data->cur_classify_info.start_timestamp.tv_sec);
   strftime(start_time_string, sizeof(start_time_string), "%Y/%m/%d %H:%M:%S", ptm);
@@ -1020,6 +1037,8 @@ static void build_response_json_for_one_classify(restful_comm_struct *restful_pt
     
     } */
 
+  syslog(LOG_DEBUG, "= Returning from build_response_for_one_classify for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
+  
   return;
 }
 
@@ -1032,10 +1051,13 @@ static void get_response_for_get_single(restful_comm_struct *restful, char **ren
 
   // TODO: should not be doing this during the HTTP REQ-REP phase
   // Should instead get this info beforehand and report the last data read    
-
+  classifyapp_struct *cur_classifyapp_data = (classifyapp_struct *)(restful->classifyapp_data + restful->get_request_classify_id);
+  
   syslog(LOG_DEBUG, "= Getting end_timestamp | %p | %d, %s", restful, __LINE__, __FILE__);
   build_response_json_for_one_classify(restful, &resp_json);
+  syslog(LOG_DEBUG, "= About to cJSON_Print for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
   *rendered_json = cJSON_Print(resp_json);
+  syslog(LOG_DEBUG, "= Done with cJSON_Print for ID: %d, %s:%d", cur_classifyapp_data->cur_classify_info.classify_id,__FILE__, __LINE__);
   
   cJSON_Delete(resp_json);		
   resp_json = NULL;
@@ -1082,8 +1104,11 @@ static void send_response_to_client(int8_t *return_http_flag,
 				    restful_comm_struct *restful_ptr)
 {
 
-  char return_msg[1024];
+  char return_msg[1024], *return_msg2 = NULL;
   char *rendered = NULL;
+  int rendered_len = 0, fixed_strlen = 0, total_len = 0;
+  bool mem_allocated = false;
+  
   /* int next_post_id = -1;
      classifyapp_struct *cur_classifyapp_data = NULL;
  
@@ -1101,23 +1126,75 @@ static void send_response_to_client(int8_t *return_http_flag,
 
   case HTTP_200:
     get_response_for_get_single(restful_ptr, &rendered);
+    
+    rendered_len = (int)(strlen(rendered) + 4);
+    fixed_strlen = (int)(strlen("HTTP/1.1 200 OK\r\n"
+				"Server: igolgi\r\n"
+				"Date: Today\r\n"
+				"Content-Type: application/json\r\n"
+				"Content-Length:1024\r\n"));
+    total_len = rendered_len + fixed_strlen + 8;
+    if (total_len >= 1024)
+      {
 
-    // syslog(LOG_INFO, "JSON RESPONSE: %s", rendered);
+	syslog(LOG_DEBUG, "= JSON RESPONSE: strlen(fixed): %d, strlen(rendered): %d, total: %d, %s:%d",
+	       fixed_strlen,
+	       rendered_len,
+	       total_len,
+	       __FILE__, __LINE__);
 
-    sprintf(return_msg,
-	    "HTTP/1.1 %d %s\r\n"                       
-	    "Server: zipreel\r\n"
-	    "Date: Today\r\n"
-	    "Content-Type: application/json\r\n"
-	    "Content-Length: %d\r\n"
-	    "\r\n"
-	    "%s\r\n\r\n",
-	    200, "OK",
-	    (int)(strlen(rendered)+4),  // +4 for the \r\n\r\n
-	    rendered);
-		  
+	return_msg2 = (char *)malloc(total_len * sizeof(char));
+	if (!return_msg2)
+	  {
+	  
+	    syslog(LOG_ERR, "= Could not allocate memory, everything ok? %s:%d", __FILE__, __LINE__);
+	    sprintf(return_msg,
+		    "HTTP/1.1 %d %s\r\n"                       
+		    "Server: igolgi\r\n"
+		    "Date: Today\r\n"
+		    "Access-Control-Allow-Methods: GET, POST\r\n",
+		    400, "Could not allocate memory");  
+	    
+	  }
+	else
+	  {
+	
+	    memset(return_msg2, 0, sizeof(total_len));
+	    
+	    sprintf(return_msg2,
+		    "HTTP/1.1 200 OK\r\n"
+		    "Server: igolgi\r\n"
+		    "Date: Today\r\n"
+		    "Content-Type: application/json\r\n"
+		    "Content-Length: %d\r\n"
+		    "\r\n"
+		    "%s\r\n\r\n",
+		    (int)(strlen(rendered)+4),  // +4 for the \r\n\r\n
+		    rendered);
+	    
+	    mem_allocated = true;
+	    
+	  }
+	
+      }
+    else
+      {
+	sprintf(return_msg,
+		"HTTP/1.1 %d %s\r\n"                       
+		"Server: igolgi\r\n"
+		"Date: Today\r\n"
+		"Content-Type: application/json\r\n"
+		"Content-Length: %d\r\n"
+		"\r\n"
+		"%s\r\n\r\n",
+		200, "OK",
+		(int)(strlen(rendered)+4),  // +4 for the \r\n\r\n
+		rendered);
+      }
+    
     free(rendered);
     rendered = NULL;
+    // syslog(LOG_DEBUG, "= After free, %s:%d", __FILE__, __LINE__);
     break;
     
   case HTTP_201: 
@@ -1227,11 +1304,21 @@ static void send_response_to_client(int8_t *return_http_flag,
     break;
 
   }
+
+  if (mem_allocated == false)
+    send(*client_sock_id, return_msg, strlen(return_msg), 0);
+  else
+    {
+      send(*client_sock_id, return_msg2, strlen(return_msg2), 0);
+      free(return_msg2);
+      return_msg2 = NULL;
+      mem_allocated =false;
+    }
   
-  send(*client_sock_id, return_msg, strlen(return_msg), 0);		  
   close(*client_sock_id);
   *client_sock_id = 0;
 
+  syslog(LOG_DEBUG, "= About to return from %s:%d", __FILE__, __LINE__);
   return;
 }
 
@@ -1376,10 +1463,10 @@ restful_comm_struct *restful_comm_create(int *server_port)
   pthread_mutex_init(&restful->thread_status_lock, NULL);
   pthread_mutex_init(&restful->next_post_id_lock, NULL);
   pthread_mutex_init(&restful->cur_process_id_lock, NULL);
-
+  
   // pthread_mutex_init(&restful->classifyapp_init_lock, NULL);
-  syslog(LOG_INFO, "= SETTING STATUS TO IDLE at initialization, %s:%d", __FILE__, __LINE__);
-  restful->classify_thread_status = CLASSIFY_THREAD_STATUS_IDLE;
+  syslog(LOG_INFO, "= SETTING STATUS TO NOTSETUP at initialization, %s:%d", __FILE__, __LINE__);
+  restful->classify_thread_status = CLASSIFY_THREAD_STATUS_NOTSETUP;
 
   //syslog(LOG_DEBUG, "CRASH FLAG: %d/%p | LINE: %d, %s", 
   //(int)classifyapp_data->appconfig.crash_recovery_flag, classifyapp_data, __LINE__, __FILE__);
