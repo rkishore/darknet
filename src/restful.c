@@ -543,22 +543,7 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
   classifyapp_struct *cur_classifyapp_data = NULL; 
   int cur_classify_thread_status = -1, next_post_id = -1;
   bool local_next_post_id_rollover_done = false;
-  
-  // Check if a new POST can be handled or not
-  // Check here? or rely on process thread to mark BUSY signal?
-  /* 
-  cur_dispatch_queue_size = message_queue_count(restful->dispatch_queue);
-  syslog(LOG_INFO, "= Dispatch message queue size: %d, %s:%d", cur_dispatch_queue_size, __FILE__, __LINE__);
-  if (cur_dispatch_queue_size >= (get_config()->max_queue_length-1))
-    {
-      pthread_mutex_lock(&restful->thread_status_lock);
-      restful->classify_thread_status = CLASSIFY_THREAD_STATUS_BUSY;
-      pthread_mutex_unlock(&restful->thread_status_lock);	      
-      *return_http_flag = HTTP_503;
-      return 0;
-    }
-  */
-  
+    
   // Check if classify thread is idle
   pthread_mutex_lock(&restful->thread_status_lock);
   cur_classify_thread_status = restful->classify_thread_status;
@@ -594,14 +579,23 @@ static int handle_post_request(cJSON **parsedjson, int8_t *return_http_flag, res
 	    
 	    double time_now = what_time_is_it_now(), processing_time_ms = cur_classifyapp_data->cur_classify_info.results_info.processing_time_in_seconds * 1000.0;
 	    double time_passed_ms = (time_now - cur_classifyapp_data->cur_classify_info.results_info.processing_time_end) * 1000.0;
-	    bool reset_results_read_flag = ( (cur_classifyapp_data->cur_classify_info.results_info.processing_time_end > 0) &&
-					     ( (processing_time_ms >= get_config()->results_read_thresh_ms) || (time_passed_ms >= get_config()->results_read_thresh_ms) ) ) ;
+	    bool reset_results_read_flag = false;
+	    int classify_status_for_this_buffer = -1;
+	    
+	    pthread_mutex_lock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	    classify_status_for_this_buffer = cur_classifyapp_data->cur_classify_info.classify_status;
+	    pthread_mutex_unlock(&cur_classifyapp_data->cur_classify_info.job_status_lock);
+	    
+	    reset_results_read_flag = ( ((cur_classifyapp_data->cur_classify_info.results_info.processing_time_end > 0) || (classify_status_for_this_buffer == CLASSIFY_STATUS_INPUT_ERROR)) &&
+					( (processing_time_ms >= get_config()->results_read_thresh_ms) || (time_passed_ms >= get_config()->results_read_thresh_ms) ) ) ;
 
-	    syslog(LOG_INFO, "= id: %d | results_read? %d processing_time_ms: %0.2f time_passed_ms: %0.2f reset_results_read? %d, %s:%d",
+	    syslog(LOG_INFO, "= id: %d | results_read? %d processing_time_ms: %0.2f time_passed_ms: %0.2f processing_time_end: %0.2f classify_status_input_error? %d reset_results_read? %d, %s:%d",
 		   next_post_id,
 		   (int)cur_classifyapp_data->cur_classify_info.results_info.results_read,
 		   processing_time_ms,
 		   time_passed_ms,
+		   cur_classifyapp_data->cur_classify_info.results_info.processing_time_end,
+		   (classify_status_for_this_buffer == CLASSIFY_STATUS_INPUT_ERROR),
 		   (int)reset_results_read_flag,
 		   __FILE__, __LINE__);
 	    
