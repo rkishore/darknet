@@ -7,8 +7,9 @@ import json
 import string
 import logging
 from PIL import Image
+import pprint
 
-logging.basicConfig(filename="/mnt/bigdrive1/cnn/project1-training-check.log", format='%(asctime)s %(levelname)s:%(message)s', level=logging.INFO)
+logging.basicConfig(filename="/mnt/bigdrive1/cnn/project1-training-check-new.log", format='%(asctime)s %(levelname)s:%(message)s', level=logging.INFO)
 
 parser = argparse.ArgumentParser(description="Convert training data provided to that required by the Darknet framework")
 parser.add_argument('--inputfilepath', type=str, help='Path to input file with list of source JSON files to be processed', required=True)
@@ -65,6 +66,45 @@ def crop(image_path, coords, saved_location):
     cropped_image.save(saved_location)
     # cropped_image.show()
 
+
+def convert_to_jpgfile_if_needed(img_dir_path, img_name_components):
+    
+    if img_dir_path.endswith("/"):
+        input_imgfile_path = img_dir_path + img_name_components[1]
+        input_png_imgfile_path = img_dir_path + img_name_components[1].replace(".jpg", ".png")
+        convert_log_filepath = img_dir_path + img_name_components[1].replace(".jpg", ".log")
+    else:
+        input_imgfile_path = img_dir_path + "/" + img_name_components[1]
+        input_png_imgfile_path = img_dir_path + "/" + img_name_components[1].replace(".jpg", ".png")
+        convert_log_filepath = img_dir_path + "/" + img_name_components[1].replace(".jpg", ".log")
+        
+    logging.info(" Working on %s" % (input_imgfile_path,))
+
+    if (os.path.exists("%s" % (input_imgfile_path,))):
+
+        # Copy image file to final destination
+        if (not os.path.exists("%s" % (input_png_imgfile_path,))):
+            logging.info(" Moving %s to %s (logfile: %s)" % (input_imgfile_path, input_png_imgfile_path, convert_log_filepath,))
+            shutil.move(input_imgfile_path, input_png_imgfile_path)
+
+            with open(convert_log_filepath, "w") as ofp_log:
+                logging.info(" Converting %s to %s" % (input_png_imgfile_path, input_imgfile_path,))
+                convert_cmd_to_exec = "/usr/bin/convert %s %s" % (input_png_imgfile_path, input_imgfile_path,)
+                ofp_log.write("%s\n" % (convert_cmd_to_exec))
+                ofp_log.flush()
+                subprocess.call(convert_cmd_to_exec, stdout=ofp_log, stderr=ofp_log, shell=True)
+                ofp_log.flush()
+                ffmpeg_info_cmd = "/usr/bin/ffmpeg -hide_banner -i \"%s\"" % (input_imgfile_path,)
+                ofp_log.write("%s\n" % (ffmpeg_info_cmd))
+                ofp_log.flush()
+                subprocess.call(ffmpeg_info_cmd, stdout=ofp_log, stderr=ofp_log, shell=True)
+
+        else:
+            logging.info("%s already exists. Conversion finished for %s" % (input_png_imgfile_path, input_imgfile_path,))
+    else:
+        logging.error(" %s does not exist!" % (input_imgfile_path,))
+
+    return input_imgfile_path
 
 if __name__ == '__main__':
 
@@ -136,77 +176,173 @@ if __name__ == '__main__':
             ifp_data = json.load(ifp)
             img_name_list = ifp_data["per_frame_info"]
 
+            print len(img_name_list)
             #print img_name_list
             
             logging.info(" Number of potential training images in %s: %d" % (filepath, len(img_name_list)))
             logging.info(" Number of expected training object images in %s: %d" % (filepath, ifp_data["objects_count"]))
-            
-            for img_name in img_name_list:
-                logging.debug(" Working on %s" % (img_name,))
-                # print "= Original img name: %s" % (img_name,)
-                img_name_components = img_name.rsplit("/", 1)
-                # print img_name_components
-                if img_dir_path.endswith("/"):
-                    input_imgfile_path = img_dir_path + img_name_components[1]
-                    final_imgfile_path = args["outputfilepath"] + "%07d.jpg" % (global_img_idx,)
-                else:
-                    input_imgfile_path = img_dir_path + "/" + img_name_components[1]
-                    final_imgfile_path = args["outputfilepath"] + "/" + "%07d.jpg" % (global_img_idx,)
 
-                logging.info(" Working on %s" % (input_imgfile_path,))
-                
-                if (os.path.exists("%s" % (input_imgfile_path,))):
+            #pprint.pprint(img_name_list)
+            img_name_empty = False
+            for img_name,val in img_name_list.items():
 
-                    # Copy image file to final destination
-                    # logging.info(" Copying %s to %s" % (input_imgfile_path, final_imgfile_path,))
-                    # shutil.copyfile(input_imgfile_path, final_imgfile_path)
+                img_name_empty = False
 
+                if len(img_name) == 0:
+                    logging.error("Empty key. Special processing")
+
+                    img_name_empty = True
+                    
                     num_objects_in_training_img = len(ifp_data["per_frame_info"][img_name]["regions"])
                     if num_objects_in_training_img > 0:
 
-                        # Get resolution of input image
-                        #img_info = Image.open(input_imgfile_path)
-                        #img_size_info = img_info.size
-
                         local_obj_idx = 0
+                        logging.info(" Number of frames in empty key: %d" % (len(ifp_data["per_frame_info"][img_name]["regions"])))
                         for objinfo in ifp_data["per_frame_info"][img_name]["regions"]:
-                                
-                            x_topleft = float(objinfo["x"])
-                            y_topleft = float(objinfo["y"])
-                            img_width = float(objinfo["width"])
-                            img_height = float(objinfo["height"])
-                            x_bottomright = x_topleft + img_width
-                            y_bottomright = y_topleft + img_height
 
-                            cur_category = objinfo["subcategory"].strip() + " " + objinfo["category"].strip()
-                            if cur_category.startswith("Cargo/Box"):
-                                cur_category = "Cargo/Box Truck"
-                            if "Trucks" in cur_category:
-                                cur_category = cur_category.replace("Trucks", "Truck")
-                            if "Van" in cur_category:
-                                cur_category = cur_category.rsplit(" Van", 1)[0]
-                                    
-                            if cur_category in categories:
-                                img_category_label = categories.index(cur_category)
-                            else:
-                                print "= Category other than expected: %s" % (cur_category,)
-                                cur_category = "Other"
-                                img_category_label = categories.index(cur_category)
+                            uid = objinfo["uid"]
+                            framenum = objinfo["frame_num"]
 
                             if img_dir_path.endswith("/"):
-                                final_imgfile_path = args["outputfilepath"] + "%s-%07d-%d.jpg" % (categories_for_img[img_category_label], global_img_idx, local_obj_idx)
+                                fixed_img_name = img_dir_path + uid + "_" + framenum + ".jpg"
                             else:
-                                final_imgfile_path = args["outputfilepath"] + "/" + "%s-%07d-%d.jpg" % (categories_for_img[img_category_label], global_img_idx, local_obj_idx)
+                                fixed_img_name = img_dir_path + "/" + uid + "_" + framenum + ".jpg"
+
+                            logging.info(" Working on %s" % (fixed_img_name,))
+                            # print "= Original img name: %s" % (img_name,)
+                            img_name_components = fixed_img_name.rsplit("/", 1)
+
+                            # print img_name_components
+                            
+                            input_imgfile_path = convert_to_jpgfile_if_needed(img_dir_path, img_name_components)
+
+                            if img_dir_path.endswith("/"):
+                                #input_imgfile_path = img_dir_path + img_name_components[1]
+                                final_imgfile_path = args["outputfilepath"] + "%07d.jpg" % (global_img_idx,)
+                            else:
+                                #input_imgfile_path = img_dir_path + "/" + img_name_components[1]
+                                final_imgfile_path = args["outputfilepath"] + "/" + "%07d.jpg" % (global_img_idx,)
                                 
-                            logging.info(" Generating cropped img from %s to %s | coordinates: (%0.1f, %0.1f, %0.1f, %0.1f)" % (input_imgfile_path, final_imgfile_path, \
-                                                                                                                                x_topleft, y_topleft, x_bottomright, y_bottomright))
-                            
-                            crop(input_imgfile_path, (x_topleft, y_topleft, x_bottomright, y_bottomright), final_imgfile_path)
-                            local_obj_idx += 1
+                            logging.info(" Working on %s" % (input_imgfile_path,))
 
-                    global_img_idx += 1
-                            
+                            if (os.path.exists("%s" % (input_imgfile_path,))):
+
+                                x_topleft = float(objinfo["x"])
+                                y_topleft = float(objinfo["y"])
+                                img_width = float(objinfo["width"])
+                                img_height = float(objinfo["height"])
+                                x_bottomright = x_topleft + img_width
+                                y_bottomright = y_topleft + img_height
+
+                                cur_category = objinfo["subcategory"].strip() + " " + objinfo["category"].strip()
+                                if cur_category.startswith("Cargo/Box"):
+                                    cur_category = "Cargo/Box Truck"
+                                if "Trucks" in cur_category:
+                                    cur_category = cur_category.replace("Trucks", "Truck")
+                                if "Van" in cur_category:
+                                    cur_category = cur_category.rsplit(" Van", 1)[0]
+
+                                if cur_category in categories:
+                                    img_category_label = categories.index(cur_category)
+                                else:
+                                    print "= Category other than expected: %s" % (cur_category,)
+                                    cur_category = "Other"
+                                    img_category_label = categories.index(cur_category)
+
+                                if img_dir_path.endswith("/"):
+                                    final_imgfile_path = args["outputfilepath"] + "%s-%07d-%d.jpg" % (categories_for_img[img_category_label], global_img_idx, local_obj_idx)
+                                else:
+                                    final_imgfile_path = args["outputfilepath"] + "/" + "%s-%07d-%d.jpg" % (categories_for_img[img_category_label], global_img_idx, local_obj_idx)
+
+                                # check if img_name_components[1] is a number or a string followed by a number
+                                if img_name_components[1][0].isdigit():
+                                    logging.info(" Generating cropped img from %s to %s | coordinates: (%0.1f, %0.1f, %0.1f, %0.1f)" % (input_imgfile_path, final_imgfile_path, \
+                                                                                                                                    x_topleft, y_topleft, x_bottomright, y_bottomright))
+
+                                    crop(input_imgfile_path, (x_topleft, y_topleft, x_bottomright, y_bottomright), final_imgfile_path)
+                                else:
+                                    logging.info(" Copying %s to %s" % (input_imgfile_path, final_imgfile_path,))
+                                    shutil.copyfile(input_imgfile_path, final_imgfile_path)
+        
+                            global_img_idx += 1        
                 else:
-                    logging.error(" %s does not exist!" % (input_imgfile_path,))
+                        
+                    #print img_name
+                    logging.info(" Working on %s" % (img_name,))
+                    # print "= Original img name: %s" % (img_name,)
+                    img_name_components = img_name.rsplit("/", 1)
+                    # print img_name_components
 
+                    input_imgfile_path = convert_to_jpgfile_if_needed(img_dir_path, img_name_components)
+                    
+                    if img_dir_path.endswith("/"):
+                        #input_imgfile_path = img_dir_path + img_name_components[1]
+                        final_imgfile_path = args["outputfilepath"] + "%07d.jpg" % (global_img_idx,)
+                    else:
+                        #input_imgfile_path = img_dir_path + "/" + img_name_components[1]
+                        final_imgfile_path = args["outputfilepath"] + "/" + "%07d.jpg" % (global_img_idx,)
 
+                    logging.info(" Working on %s" % (input_imgfile_path,))
+
+                    if (os.path.exists("%s" % (input_imgfile_path,))):
+
+                        # Copy image file to final destination
+                        # logging.info(" Copying %s to %s" % (input_imgfile_path, final_imgfile_path,))
+                        # shutil.copyfile(input_imgfile_path, final_imgfile_path)
+
+                        num_objects_in_training_img = len(ifp_data["per_frame_info"][img_name]["regions"])
+                        if num_objects_in_training_img > 0:
+
+                            # Get resolution of input image
+                            #img_info = Image.open(input_imgfile_path)
+                            #img_size_info = img_info.size
+
+                            local_obj_idx = 0
+                            for objinfo in ifp_data["per_frame_info"][img_name]["regions"]:
+
+                                x_topleft = float(objinfo["x"])
+                                y_topleft = float(objinfo["y"])
+                                img_width = float(objinfo["width"])
+                                img_height = float(objinfo["height"])
+                                x_bottomright = x_topleft + img_width
+                                y_bottomright = y_topleft + img_height
+
+                                cur_category = objinfo["subcategory"].strip() + " " + objinfo["category"].strip()
+                                if cur_category.startswith("Cargo/Box"):
+                                    cur_category = "Cargo/Box Truck"
+                                if "Trucks" in cur_category:
+                                    cur_category = cur_category.replace("Trucks", "Truck")
+                                if "Van" in cur_category:
+                                    cur_category = cur_category.rsplit(" Van", 1)[0]
+
+                                if cur_category in categories:
+                                    img_category_label = categories.index(cur_category)
+                                else:
+                                    print "= Category other than expected: %s" % (cur_category,)
+                                    cur_category = "Other"
+                                    img_category_label = categories.index(cur_category)
+
+                                if img_dir_path.endswith("/"):
+                                    final_imgfile_path = args["outputfilepath"] + "%s-%07d-%d.jpg" % (categories_for_img[img_category_label], global_img_idx, local_obj_idx)
+                                else:
+                                    final_imgfile_path = args["outputfilepath"] + "/" + "%s-%07d-%d.jpg" % (categories_for_img[img_category_label], global_img_idx, local_obj_idx)
+
+                                # check if img_name_components[1] is a number or a string followed by a number
+                                if img_name_components[1][0].isdigit():
+                                    logging.info(" Generating cropped img from %s to %s | coordinates: (%0.1f, %0.1f, %0.1f, %0.1f)" % (input_imgfile_path, final_imgfile_path, \
+                                                                                                                                    x_topleft, y_topleft, x_bottomright, y_bottomright))
+
+                                    crop(input_imgfile_path, (x_topleft, y_topleft, x_bottomright, y_bottomright), final_imgfile_path)
+                                else:
+                                    logging.info(" Copying %s to %s" % (input_imgfile_path, final_imgfile_path,))
+                                    shutil.copyfile(input_imgfile_path, final_imgfile_path)
+
+                                local_obj_idx += 1
+
+                        global_img_idx += 1
+
+                    else:
+                        logging.error(" %s does not exist!" % (input_imgfile_path,))
+                        
+
+                    

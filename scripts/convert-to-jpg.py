@@ -8,7 +8,7 @@ import string
 import logging
 from PIL import Image
 
-logging.basicConfig(filename="/mnt/bigdrive1/cnn/project1-training-convert-to-jpg.log", format='%(asctime)s %(levelname)s:%(message)s', level=logging.INFO)
+logging.basicConfig(filename="/mnt/bigdrive1/cnn/project1-training-convert-to-jpg-new.log", format='%(asctime)s %(levelname)s:%(message)s', level=logging.INFO)
 
 parser = argparse.ArgumentParser(description="Convert training data provided to that required by the Darknet framework")
 parser.add_argument('--inputfilepath', type=str, help='Path to input file with list of source JSON files to be processed', required=True)
