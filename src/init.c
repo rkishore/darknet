@@ -133,6 +133,7 @@ get_info_from_cmdline_args(int *argc, char **argv)
       break; 
     case 'm':
       mod_config()->tmp_output_path = optarg;
+      syslog(LOG_INFO, "= tmp_output_path: %s, %s:%d", optarg, __FILE__, __LINE__);
       break;
     case 'n':
       mod_config()->fastmode = true;
@@ -169,12 +170,13 @@ get_info_from_cmdline_args(int *argc, char **argv)
 	  get_config()->interface_name,
 	  get_config()->data_folder_path);
 
-  fprintf(stderr, "= CMDLINE args 2 | max-queue-length: %d (default: %d) | dont_overwrite_results_flag: %d | fastmode: %d | results_read_thresh_ms: %0.2f\n",
+  fprintf(stderr, "= CMDLINE args 2 | max-queue-length: %d (default: %d) | dont_overwrite_results_flag: %d | fastmode: %d | results_read_thresh_ms: %0.2f | tmp_output_path: %s\n",
 	  get_config()->max_queue_length,
 	  (int)MAX_MESSAGES_PER_WINDOW,
 	  (int)get_config()->dont_overwrite_old_results_until_read,
 	  (int)get_config()->fastmode,
-	  get_config()->results_read_thresh_ms);
+	  get_config()->results_read_thresh_ms,
+	  get_config()->tmp_output_path);
   
   if ( (get_config()->max_queue_length > MAX_ALLOWED_MESSAGES_PER_WINDOW) || (get_config()->max_queue_length < 1) )
     {

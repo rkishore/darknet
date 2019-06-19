@@ -1579,12 +1579,12 @@ void run_detector_custom(struct prep_network_info *prep_netinfo,
 	
 	if ( (outfile == NULL) || (strlen(outfile) == 0) )
 	  {
-	    syslog(LOG_DEBUG, "= Outfile is NULL/unspecified, writing to predictions, %s:%d", __FILE__, __LINE__);
+	    syslog(LOG_INFO, "= Outfile is NULL/unspecified, writing to predictions, %s:%d", __FILE__, __LINE__);
 	    save_image(im, "/tmp/predictions");
 	  }
 	else
 	  {
-	    syslog(LOG_DEBUG, "= Outfile is not NULL, writing to %s, %s:%d", outfile, __FILE__, __LINE__);
+	    syslog(LOG_INFO, "= Outfile is not NULL, writing to %s, %s:%d", outfile, __FILE__, __LINE__);
 	    save_image(im, outfile);
 	  }
       }

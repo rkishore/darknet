@@ -89,7 +89,8 @@ static int check_file_type(char *filepath, char *filetype_to_check)
 {
   char *filecmd = NULL;
   int typecheck = -1;
-  
+
+  syslog(LOG_INFO, "= About to exec /usr/bin/file %s | grep %s, %s:%d", filepath, filetype_to_check, __FILE__, __LINE__);
   if (asprintf(&filecmd, "/usr/bin/file %s | grep %s", filepath, filetype_to_check) < 0)
     {
       syslog(LOG_ERR, "= Could not asprintf filecmd, %s:%d", __FILE__, __LINE__);
@@ -97,6 +98,7 @@ static int check_file_type(char *filepath, char *filetype_to_check)
     }
   
   typecheck = system(filecmd);  
+  syslog(LOG_INFO, "= typecheck returned val: %d, %s:%d", typecheck, __FILE__, __LINE__);
   
   free(filecmd);
   filecmd = NULL;
@@ -166,9 +168,10 @@ static int check_input_url(classifyapp_struct *cur_classifyapp_data)
   
       // Check if this is a text file to reject it
       typecheck = check_file_type(samplefilename, "text");
-      if (typecheck <= 0) // if its an error (typecheck = -1) or a text file (typecheck = 0)
+      if (typecheck == 0) // if its a text file (typecheck = 0)
 	{
 
+	  syslog(LOG_ERR, "= file_type: text?, %s:%d", __FILE__, __LINE__);
 	  free(samplefilename);
 	  samplefilename = NULL;
       
@@ -176,7 +179,7 @@ static int check_input_url(classifyapp_struct *cur_classifyapp_data)
 	  goto exit_check_input_url;
       
 	}
-
+            
       if (strlen(cur_classifyapp_data->appconfig.input_mode) == 0)
 	{
 
