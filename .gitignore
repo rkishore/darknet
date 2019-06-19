@@ -4,6 +4,7 @@
 *.out
 *.png
 *.so
+*.log
 mnist/
 data/
 caffe/
@@ -34,3 +35,4 @@ restd/bin/
 classifyapp_frontend/db.sqlite3
 classifyapp_frontend/*/*.pyc
 classifyapp-rest/venv/
+scripts/coco*
