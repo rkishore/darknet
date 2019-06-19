@@ -27,6 +27,10 @@ categories_for_img = ['cargo-truck',
                       'flatbed-truck',
                       'lowboy-semi-truck']
 
+output_categories = ['person',
+                     'car',
+                     'service-vehicle',]
+
 num_cat_imgs = {}
 
 total_categories = len(categories_for_img)
@@ -96,14 +100,14 @@ if __name__ == "__main__":
         
     base_input_csv_path = args["inputfilepath"].rsplit("/", 1)[0]
 
-    for cat in categories_for_img:
+    for cat in output_categories:
         num_cat_imgs[cat] = 0
 
-    logging.info(" Number of categories: %d" % (len(categories_for_img)))
+    logging.info(" Number of categories: %d | number of output categories: %d" % (len(categories_for_img), len(output_categories)))
     #for idx,cat in enumerate(categories_for_img):
     #    print idx,cat
     with open(args["outputcatfile"], "w") as ofp:
-        for cat in categories_for_img:
+        for cat in output_categories:
             ofp.write("%s\n" % (cat,))
 
     imagelist_ofp = open(args["outputimagesfile"], "w")
@@ -148,18 +152,20 @@ if __name__ == "__main__":
             full_output_img_path = convert_to_jpgfile_if_needed(full_output_img_path)
 
             with open(full_output_label_path, "w") as ofp:
-                logging.info(" Writing to %s: %d %0.6f %0.6f %0.6f %0.6f" % (full_output_label_path, categories_for_img.index(cur_category), x_center_normalized, y_center_normalized, img_width_normalized, img_height_normalized,))
-                ofp.write("%d %0.6f %0.6f %0.6f %0.6f\n" % (categories_for_img.index(cur_category), x_center_normalized, y_center_normalized, img_width_normalized, img_height_normalized,))
-                
+                if cur_category in categories_for_img:
+                    logging.info(" Writing to %s: %d %0.6f %0.6f %0.6f %0.6f" % (full_output_label_path, output_categories.index("service-vehicle"), x_center_normalized, y_center_normalized, img_width_normalized, img_height_normalized,))
+                    ofp.write("%d %0.6f %0.6f %0.6f %0.6f\n" % (output_categories.index("service-vehicle"), x_center_normalized, y_center_normalized, img_width_normalized, img_height_normalized,))
+                    num_cat_imgs["service-vehicle"] += 1
+                else:
+                    logging.info(" SHOULD NOT BE HERE")
             # print "%d %0.6f %0.6f %0.6f %0.6f" % (categories_for_img.index(cur_category), x_center_normalized, y_center_normalized, img_width_normalized, img_height_normalized,)
             #if cur_category.startswith("water-tanker") or cur_category.startswith("septic-tanker"):
-            num_cat_imgs[cur_category] += 1
             num_lines += 1
 
     imagelist_ofp.close()
     
 logging.info(" DEBUG STATS | number of images/cat: ")
-for cat in categories_for_img:
+for cat in output_categories:
     logging.info("%s %s" % (cat, num_cat_imgs[cat]))
 
 logging.info(" DEBUG STATS | number of uniq images: %d/%d total" % (len(uniq_img_list), num_lines))
