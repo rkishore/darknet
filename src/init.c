@@ -296,10 +296,15 @@ check_if_key_files_and_paths_exist()
       {
 	
 	if (!get_config()->tmp_output_path)
+	{
+	  fprintf(stderr, "= tmp_output_path not specified - mandatory. Exiting\n");
 	  syslog(LOG_ERR, "= tmp_output_path not specified - mandatory. Exiting");
+	}	
 	else if ( access(get_config()->tmp_output_path, F_OK) == -1 )
+	{
+	  fprintf(stderr, "= tmp_output_path %s not specified - mandatory. Exiting\n", get_config()->tmp_output_path);
 	  syslog(LOG_ERR, "= tmp_output_path %s not accessible. Exiting.", get_config()->tmp_output_path);
-	  
+	}  
       }
     
     if ( access(get_config()->dnn_data_file, F_OK ) == -1 )
